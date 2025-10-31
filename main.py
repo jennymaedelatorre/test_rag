@@ -1,181 +1,173 @@
-# =======================
-# 📘 MCQ Generator using Gemini + LangChain + FAISS
-# =======================
+import os
+import tempfile
+import uuid
+import logging
+from pathlib import Path
+from typing import Dict
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
+import google.generativeai as genai
 
-# --- Import necessary libraries ---
-from dotenv import load_dotenv            # Loads environment variables from a .env file
-import os                                # Used for file path handling and environment variable access
-import google.generativeai as genai       # Google Gemini (Generative AI) SDK
-from langchain.document_loaders import PyPDFLoader  # To read PDF files as documents
-from langchain.text_splitter import CharacterTextSplitter  # For chunking text into manageable parts
-from langchain.embeddings import HuggingFaceEmbeddings     # For generating embeddings using HuggingFace models
-from langchain.vectorstores import FAISS                   # FAISS for fast vector-based search/retrieval
-from langchain.prompts import (
-    ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate
-)                                                           # For creating prompt templates
-from langchain.chains import RetrievalQA                    # Retrieval-augmented QA chain
-from langchain.llms.base import LLM                         # Base class for custom LLM wrappers
+# Import custom modules
+from core.processing import load_and_chunk, get_or_create_vector_store, calculate_file_hash
+from database.session import save_document, initialize_database
+from core.langchain_chain import build_chain
 
+# ----------------------------
+# 🔧 Basic Setup & Config
+# ----------------------------
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# =======================
-# 1️⃣ Configure Gemini API
-# =======================
+app = FastAPI(title="MCQ Generator API")
+load_dotenv()
 
-load_dotenv()                        # Load environment variables from the .env file
-API_KEY = os.getenv("API_KEY")       # Fetch your Gemini API key from environment variables
-genai.configure(api_key=API_KEY)     # Initialize Gemini client with the API key
+API_KEY = os.getenv("API_KEY")
+if not API_KEY:
+    raise SystemExit("❌ Gemini API key missing in .env file!")
 
+genai.configure(api_key=API_KEY)
 
-# =======================
-# 2️⃣ Define a Gemini Wrapper for LangChain
-# =======================
+# Directories
+CACHE_DIR = Path("./faiss_cache")
+CACHE_DIR.mkdir(exist_ok=True)
+TEMP_UPLOAD_DIR = Path(tempfile.gettempdir()) / "mcq_uploads"
+TEMP_UPLOAD_DIR.mkdir(exist_ok=True)
 
-# LangChain expects any LLM to follow a consistent interface (methods, properties)
-# This custom class wraps Google Gemini inside that interface.
-
-class GeminiLLM(LLM):
-    # The main function LangChain calls to get the model’s output
-    def _call(self, prompt, stop=None):
-        model = genai.GenerativeModel("gemini-2.0-flash")  # Load Gemini model
-        response = model.generate_content(prompt)           # Generate text from the input prompt
-        return response.text                                # Return the generated text
-
-    # Return identifying parameters (metadata about the LLM)
-    @property
-    def _identifying_params(self):
-        return {"model_name": "gemini-2.0-flash"}
-
-    # Return the LLM type (used internally by LangChain)
-    @property
-    def _llm_type(self):
-        return "gemini"
+initialize_database()
 
 
-# =======================
-# 3️⃣ Function: Load and Chunk PDF Documents
-# =======================
+# ----------------------------
+# 🏠 Root Endpoint
+# ----------------------------
+@app.get("/")
+def root() -> Dict[str, str]:
+    return {"message": "✅ Server is running! Use the /generate-mcq/ endpoint with a POST request."}
 
-def load_and_chunk(file_path, chunk_size=500, overlap=90):
+
+# ----------------------------
+# 🧠 Generate MCQ Endpoint
+# ----------------------------
+@app.post("/generate-mcq/")
+async def generate_mcq(
+    file: UploadFile = File(...),
+    topics: str = Form(...),
+    num_questions: int = Form(...)
+) -> JSONResponse:
     """
-    Loads a PDF file, extracts its text, and splits it into smaller overlapping chunks.
-    This helps the model handle large documents efficiently while maintaining context.
+    Uploads a PDF, processes or loads it from cache, retrieves topic-relevant chunks,
+    and generates multiple-choice questions.
     """
-    loader = PyPDFLoader(file_path)                    # Load the PDF file
-    documents = loader.load()                          # Extract text content into Document objects
-    text_splitter = CharacterTextSplitter(             # Initialize text splitter
-        chunk_size=chunk_size,                         # Maximum characters per chunk
-        chunk_overlap=overlap                          # Overlapping region between consecutive chunks
-    )
-    docs = text_splitter.split_documents(documents)    # Split text into chunks
-    return docs                                        # Return list of chunked documents
+
+    # ✅ Basic Validations
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
+
+    if num_questions <= 0 or num_questions > 10:
+        raise HTTPException(status_code=400, detail="Number of questions must be between 1 and 10.")
+
+    topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+    if not topic_list:
+        raise HTTPException(status_code=400, detail="No valid topics provided.")
+
+    original_filename = file.filename
+    unique_filename = f"{uuid.uuid4()}-{original_filename}"
+    temp_file_path = TEMP_UPLOAD_DIR / unique_filename
+
+    # ----------------------------
+    # 🧾 Save Uploaded File Temporarily
+    # ----------------------------
+    try:
+        file_content = await file.read()
+        with open(temp_file_path, "wb") as buffer:
+            buffer.write(file_content)
+
+        # 1️⃣ Calculate File Hash
+        file_hash = calculate_file_hash(str(temp_file_path))
+        if not file_hash:
+            raise HTTPException(status_code=500, detail="Could not calculate file hash.")
+
+        index_path = CACHE_DIR / file_hash
+        faiss_action_status = ""
+        retriever = None
+        document_uuid = str(uuid.uuid4())
+
+        # ----------------------------
+        # 💾 Check Cache / DB
+        # ----------------------------
+        if index_path.exists():
+            logging.info("📦 Cache hit — loading FAISS index.")
+            retriever, faiss_action_status = get_or_create_vector_store(str(index_path))
+        else:
+            logging.info("🆕 Cache miss — creating new FAISS index.")
+
+            # ✅ Load and chunk PDF
+            docs = load_and_chunk(str(temp_file_path), document_id=document_uuid)
+            if not docs:
+                raise HTTPException(status_code=500, detail="No readable content found in PDF.")
+
+            # ✅ Create FAISS Vector Store
+            retriever, faiss_action_status = get_or_create_vector_store(str(index_path), docs=docs)
+
+            # ✅ Save metadata only after successful index creation
+            try:
+                    save_document(original_filename, str(index_path), document_uuid)
+
+                    logging.info(f"✅ DB: Document '{original_filename}' saved successfully.")
+            except Exception as db_e:
+                logging.error(f"DB FAILURE: Could not save document metadata. Error: {db_e}")
+                raise HTTPException(status_code=500, detail=f"Failed to record document in database: {db_e}")
+
+        # ----------------------------
+        # 🔍 Retrieve Chunks by Topic
+        # ----------------------------
+        all_retrieved_chunks = []
+        per_topic_chunks = []
+
+        for topic in topic_list:
+            retrieved = retriever.get_relevant_documents(topic)[:2]
+            all_retrieved_chunks.extend(retrieved)
+            per_topic_chunks.append({
+                "query": topic,
+                "document_uuid": document_uuid, 
+                "chunks": [doc.page_content for doc in retrieved]
+            })
+
+        merged_context = "\n\n".join([doc.page_content for doc in all_retrieved_chunks])
+
+        if not merged_context.strip():
+            raise HTTPException(status_code=400, detail="No relevant content found for the given topics.")
+
+        # ----------------------------
+        # 🤖 Run LLM Chain (Gemini)
+        # ----------------------------
+        chain = build_chain()
+        response_text = chain.run(topic_list, merged_context, num_questions=num_questions)
+
+        # ----------------------------
+        # 📤 Return JSON Response
+        # ----------------------------
+        return JSONResponse({
+            "status": "success",
+            "file_name": original_filename,
+            "file_hash": file_hash,
+            "faiss_action": faiss_action_status,
+            "topics": topic_list,
+            "generated_mcqs": response_text.strip(),
+            "retrieved_chunks": per_topic_chunks
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"❌ An unhandled error occurred in /generate-mcq/: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+    finally:
+        # 🧹 Cleanup temp file
+        if temp_file_path.exists():
+            os.remove(temp_file_path)
+            logging.info(f"🧹 Temporary file removed: {temp_file_path}")
 
 
-# =======================
-# 4️⃣ Function: Create or Load FAISS Vector Store
-# =======================
-
-def get_or_create_vector_store(index_path="faiss_index", docs=None):
-    """
-    Loads an existing FAISS index (if present) or creates a new one from the given documents.
-    The FAISS index enables efficient semantic search across the text chunks.
-    """
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")  # Load embedding model
-
-    # If FAISS index already exists, load it from disk
-    if os.path.exists(index_path):
-        print("🟢 Loading existing FAISS index...")
-        db = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
-    else:
-        # Otherwise, create a new index from documents
-        if docs is None:
-            raise ValueError("❌ No documents provided to build FAISS index!")
-        print("🟡 Creating new FAISS index...")
-        db = FAISS.from_documents(docs, embeddings)  # Create FAISS index from document embeddings
-        db.save_local(index_path)                    # Save the index for reuse
-
-    # Return a retriever object that can fetch relevant chunks for a given query
-    return db.as_retriever()
-
-
-# =======================
-# 5️⃣ Define Prompt Templates
-# =======================
-
-# The "system" prompt defines the role and rules for the AI assistant.
-system_template = """
-You are an expert exam question creator. 
-Your task is to generate multiple-choice questions (MCQs)
-STRICTLY based on the provided study material.
-
-Each question must:
-- Have 4 options (A, B, C, D)
-- Mark the correct answer with an asterisk (*)
-- Avoid numbering answers with asterisks unless it's the correct one
-- Keep questions concise and relevant to the topic
-"""
-
-# The "user" prompt will include the topic and retrieved study material.
-user_template = """
-Topic: {question}
-
-Study Material:
-{context}
-"""
-
-# Combine both templates into a structured conversation format
-system_prompt = SystemMessagePromptTemplate.from_template(system_template)
-user_prompt = HumanMessagePromptTemplate.from_template(user_template)
-prompt_template = ChatPromptTemplate.from_messages([system_prompt, user_prompt])
-
-
-# =======================
-# 6️⃣ Function: Build the RetrievalQA Chain
-# =======================
-
-def build_chain(retriever):
-    """
-    Combines the Gemini LLM with the retriever and the prompt template
-    to form a RetrievalQA pipeline — a system that retrieves relevant
-    information and generates context-aware answers.
-    """
-    llm = GeminiLLM()  # Use our custom Gemini wrapper
-    chain = RetrievalQA.from_chain_type(
-        llm=llm,                                 # The language model
-        retriever=retriever,                     # The FAISS retriever
-        chain_type="stuff",                      # Stuff = combine retrieved docs into one prompt
-        chain_type_kwargs={"prompt": prompt_template},  # Use our custom prompt template
-        return_source_documents=False            # We only want the generated answer, not the retrieved docs
-    )
-    return chain
-
-
-# =======================
-# 7️⃣ Main Program Execution
-# =======================
-
-if __name__ == "__main__":
-    index_path = "faiss_index"       # Define where the FAISS index will be stored
-
-    docs = None                      # Initialize document variable
-    if not os.path.exists(index_path):
-        # If no FAISS index exists, load and chunk the PDF first
-        docs = load_and_chunk("data/sample.pdf")
-
-    # Load or create the vector store (retriever)
-    retriever = get_or_create_vector_store(index_path, docs)
-
-    # Build the question-generation chain
-    chain = build_chain(retriever)
-
-    # Ask user for topic and number of questions
-    topic = input("🎯 Enter the topic or concept for which you want to generate MCQs: ")
-    num_questions = int(input("🔢 Enter the number of MCQs to generate: "))
-
-    # Generate MCQs using Retrieval + LLM chain
-    response = chain.invoke({"query": f"Generate {num_questions} MCQs about {topic}"})
-
-    # Print final output
-    print("\n📘 Generated MCQs:\n")
-    print(response["result"].strip())
+# run: uvicorn main:app --reload
