@@ -1,0 +1,227 @@
+{% extends 'faculty/base.html' %}
+{% block title %}CILOs{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4 px-3">
+    <div class="me-3">
+        Hello, <span class="fw-bold">{{ faculty.full_name }}</span>!
+    </div>
+
+    <form class="d-flex flex-grow-1 me-3" role="search">
+        <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
+        <button class="btn btn-outline-success" type="submit">
+            <i class="fa fa-search"></i>
+        </button>
+    </form>
+
+    <div class="d-flex align-items-center">
+        <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
+        <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+    </div>
+</div>
+
+<div class="container">
+
+    <div class="mb-4 text-start">
+        <h2>Course Intended Learning Outcomes (CILOs)</h2>
+        <p class="text-secondary">View and track Course Outcomes (COs) for each subject, mapping assessments to COs to monitor student learning and  <br>progress effectively</p>
+    </div>
+    
+    {% for course in courses %}
+    <div class="row g-4 mb-5">
+        
+        <div class="col-12 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white p-3">
+                    {{ course.title }} - Average Achievement by Outcome (CO) (STATIC CHART)
+                </div>
+                <div class="card-body" style="height: 350px;"> 
+                    <canvas id="staticCoAvgChart-{{ course.id }}"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+    <div class="card shadow">
+        <div class="card-header bg-success text-white p-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span style="font-size: 1.1rem;">Individual Student Progress</span>
+                <select class="form-select w-auto" id="studentFilter-{{ loop.index }}">
+                    <option value="all">All Students</option>
+                    {% for student in students %}
+                    <option value="{{ student.id }}">{{ student.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <small class="text-white-50 d-block" style="font-size: .90rem; margin-top: -8px;">
+                View student progress for each Course Outcome (CO)
+            </small>
+        </div>
+
+        <div class="card-body">
+            
+            {% set static_cilo_progress_map = {
+                1: [ {'code': 'CO1', 'progress': 85}, {'code': 'CO2', 'progress': 70}, {'code': 'CO3', 'progress': 92} ],
+                2: [ {'code': 'CO1', 'progress': 62}, {'code': 'CO2', 'progress': 78}, {'code': 'CO3', 'progress': 55} ],
+                3: [ {'code': 'CO1', 'progress': 91}, {'code': 'CO2', 'progress': 80}, {'code': 'CO3', 'progress': 75} ],
+                4: [ {'code': 'CO1', 'progress': 77}, {'code': 'CO2', 'progress': 75}, {'code': 'CO3', 'progress': 68} ],
+            } %}
+
+            <div class="row g-4">
+            {% for student in students %}
+                {% set cilo_breakdown = static_cilo_progress_map[student.id] | default(false) %}
+
+                <div class="col-12 student-progress" data-student-id="{{ student.id }}">
+                    <div class="card text-center p-3 shadow-sm border-0" style="border-radius: 15px; background: #fefefe;">
+                        <h6 class="fw-bold mb-1">{{ student.full_name }}</h6>
+                        <small class="text-muted mb-3 d-block">ID: {{ student.id }}</small>
+
+                        {% if cilo_breakdown %}
+                        <div class="d-flex justify-content-around flex-wrap">
+                            {% for co in cilo_breakdown %}
+                            {% set color = co.progress >= 85 and '#28a745' or co.progress >= 70 and '#17a2b8' or co.progress >= 50 and '#ffc107' or '#dc3545' %}
+                            <div class="d-flex flex-column align-items-center m-2">
+                                <!-- Bigger circle (100x100) -->
+                                <svg width="100" height="100">
+                                    <circle cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="10" fill="none"></circle>
+                                    <circle cx="50" cy="50" r="40" stroke="{{ color }}" stroke-width="10" fill="none"
+                                        stroke-dasharray="251.2"
+                                        stroke-dashoffset="{{ 251.2 - (251.2 * co.progress / 100) }}"
+                                        transform="rotate(-90 50 50)" style="transition: stroke-dashoffset 1s;"></circle>
+                                    <text x="50" y="55" text-anchor="middle" font-size="16" fill="#333">{{ co.progress }}%</text>
+                                </svg>
+                                <small class="fw-bold mt-2">{{ co.code }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                            <p class="text-muted fst-italic">No progress data available.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+            {% endfor %}
+            </div>
+
+            <!-- Legend -->
+            <div class="mt-4 d-flex justify-content-center gap-3 flex-wrap">
+                <div class="d-flex align-items-center gap-1">
+                    <span class="d-inline-block" style="width: 15px; height: 15px; background: #28a745; border-radius: 50%;"></span>
+                    <small>Excellent (≥85%)</small>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="d-inline-block" style="width: 15px; height: 15px; background: #17a2b8; border-radius: 50%;"></span>
+                    <small>Good (70–84%)</small>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="d-inline-block" style="width: 15px; height: 15px; background: #ffc107; border-radius: 50%;"></span>
+                    <small>Average (50–69%)</small>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="d-inline-block" style="width: 15px; height: 15px; background: #dc3545; border-radius: 50%;"></span>
+                    <small>Poor (<50%)</small>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+        
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white py-4" style="font-size: 1rem;">
+                    CILOs for {{ course.title }}
+                </div>
+                <ul class="list-group list-group-flush ">
+                    {% for cilo in course.cilos %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        {{ cilo.cilo_code }}: {{ cilo.description }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block footer_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // 1️⃣ STATIC Vertical Bar Chart Implementation
+    // We target a canvas with the generic 'staticCoAvgChart-' ID
+    const staticChartCanvases = document.querySelectorAll('[id^="staticCoAvgChart-"]');
+
+    staticChartCanvases.forEach(canvas => {
+        
+        const ctx = canvas.getContext('2d');
+        
+        // 🔑 HARDCODED STATIC DATA
+        const staticLabels = ['CO1', 'CO2', 'CO3'];
+        const staticData = [88, 75, 95];
+
+        if (!ctx) return; 
+
+        new Chart(ctx, {
+            type: 'bar', // Vertical bar chart
+            data: {
+                labels: staticLabels,
+                datasets: [{
+                    label: 'Average Proficiency (%)',
+                    data: staticData,
+                    backgroundColor: [
+                'rgba(0, 188, 212, 0.8)',   // CO1 - cyan
+                'rgba(255, 193, 7, 0.8)',   // CO2 - yellow
+                'rgba(220, 53, 69, 0.8)'    // CO3 - red
+            ],
+            borderColor: [
+                '#00bcd4',
+                '#ffc107',
+                '#dc3545'
+            ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true }, // Categories (Labels)
+                    y: { // Values (Progress Percentage)
+                        min: 0, max: 100,
+                        ticks: { callback: function(value) { return value + "%" } },
+                        title: { display: true, text: 'Average Score' }
+                    }
+                }
+            }
+        });
+    });
+
+    // 2️⃣ Student Progress Filter 
+    {% for course in courses %}
+    const filterId = 'studentFilter-{{ loop.index }}';
+    const filterElement = document.getElementById(filterId);
+    
+    const courseRow = filterElement ? filterElement.closest('.row') : null;
+    const studentCards = courseRow ? courseRow.querySelectorAll('.student-progress') : [];
+
+    if (filterElement) {
+        filterElement.addEventListener('change', (e) => {
+            const value = e.target.value;
+            studentCards.forEach(div => {
+                div.style.display = (value === 'all' || div.dataset.studentId === value) ? 'block' : 'none';
+            });
+        });
+    }
+    {% endfor %}
+
+});
+</script>
+{% endblock %}

@@ -1,11 +1,11 @@
 import os
-import uuid
 import logging 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from database.models import Base, Document 
+from database.models import Base
 import logging 
+
 
 load_dotenv()
 
@@ -37,21 +37,9 @@ def initialize_database():
         logging.error(f"Failed to initialize database: {e}")
 
 
-def save_document(document_name: str, file_path: str, document_uuid: str):
-    """Saves the document to the database."""
-    session = SessionLocal()
+def get_db():
+    db = SessionLocal()  # open a new database connection
     try:
-        new_doc = Document(
-            file_name=document_name, 
-            file_path=file_path,
-            document_uuid=document_uuid
-            )
-        session.add(new_doc)
-        session.commit()
-        logging.info(f"✅ DB SUCCESS: Saved metadata for: {document_name} at {file_path}")
-    except Exception as e:
-        session.rollback()
-        logging.error(f"❌ DB FAILURE: Failed to save metadata for {document_name}. Error: {e}")
-        raise 
+        yield db          # let the calling code use it
     finally:
-        session.close()
+        db.close()         # automatically close it when done

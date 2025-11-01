@@ -1,0 +1,176 @@
+{% extends 'student/base.html' %}
+
+{% block title %}CILOs{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 px-3">
+  <div class="me-3">
+    Hello, <span class="fw-bold">{{ student.full_name }}</span>!
+  </div>
+
+  <form class="d-flex flex-grow-1 me-3" role="search">
+    <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
+    <button class="btn btn-outline-success" type="submit">
+      <i class="fa fa-search"></i>
+    </button>
+  </form>
+
+  <div class="d-flex align-items-center">
+    <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
+    <img src="/static/imgs/student1.jpg" alt="Profile" class="rounded-circle"
+      style="width: 40px; height: 40px; object-fit: cover;">
+  </div>
+</div>
+
+<div class="container">
+  <h2 class="mb-4 text-center">Course Intended Learning Outcomes (CILOs)</h2>
+
+  <div class="mb-4 text-center">
+    <label for="courseFilter" class="form-label">Select Course:</label>
+    <select class="form-select w-auto d-inline-block" id="courseFilter">
+      <option value="all">All Courses</option>
+      <option value="it101">Introduction to Programming</option>
+      <option value="it102">Computer Fundamentals</option>
+    </select>
+  </div>
+
+  <div class="row g-4">
+    <!-- 🧩 Example Course -->
+    <div class="col-md-6">
+      <div class="card shadow border-0 h-100">
+        <div class="card-body p-4">
+          <h5 class="card-title mb-4">Introduction to Programming</h5>
+
+          <div class="row">
+            <div class="col-8">
+              <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                  <strong>CILO 1: Apply programming concepts</strong>
+                  <small>85%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                  <div class="progress-bar bg-success" style="width: 85%"></div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                  <strong>CILO 2: Design algorithms</strong>
+                  <small>70%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                  <div class="progress-bar bg-info" style="width: 70%"></div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                  <strong>CILO 3: Debug simple programs</strong>
+                  <small>90%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                  <div class="progress-bar bg-warning" style="width: 90%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-4 d-flex justify-content-center align-items-center">
+              <canvas id="chart-1"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🧩 Another Course -->
+    <div class="col-md-6">
+      <div class="card shadow border-0 h-100">
+        <div class="card-body p-4">
+          <h5 class="card-title mb-4">Computer Fundamentals</h5>
+
+          <div class="row">
+            <div class="col-8">
+              <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                  <strong>CILO 1: Explain computer hardware</strong>
+                  <small>60%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                  <div class="progress-bar bg-danger" style="width: 60%"></div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                  <strong>CILO 2: Identify software types</strong>
+                  <small>75%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                  <div class="progress-bar bg-primary" style="width: 75%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-4 d-flex justify-content-center align-items-center">
+              <canvas id="chart-2"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Plugin to display text in center
+  const centerText = {
+    id: 'centerText',
+    beforeDraw(chart) {
+      const { width, height, ctx } = chart;
+      ctx.restore();
+      const value = chart.config.data.datasets[0].data[0];
+      ctx.font = "1.2em sans-serif";
+      ctx.textBaseline = "middle";
+      const text = value + "%";
+      const textX = (width - ctx.measureText(text).width) / 2;
+      const textY = height / 2;
+      ctx.fillStyle = "#28a745";
+      ctx.fillText(text, textX, textY);
+      ctx.save();
+    }
+  };
+
+  Chart.register(centerText);
+
+  const charts = [
+    { id: "chart-1", progress: 82 },
+    { id: "chart-2", progress: 68 }
+  ];
+
+  charts.forEach((c) => {
+    const ctx = document.getElementById(c.id);
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [c.progress, 100 - c.progress],
+          backgroundColor: ['#28a745', '#e9ecef'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        cutout: '70%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false }
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}

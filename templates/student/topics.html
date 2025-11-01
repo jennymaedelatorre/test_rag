@@ -1,0 +1,86 @@
+{% extends 'student/base.html' %}
+
+{% block title %}Course Topics{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">Course: {{ course.title }}</h3>
+        
+        <a href="/student/courses" class="btn btn-sm btn-secondary">
+            <i class="bi bi-arrow-left me-1 "></i> Back to Course
+        </a>
+    </div>
+
+
+    {% if topics %}
+    {% for topic in topics %}
+    <div class="card shadow mt-3">
+        <div class="card-header bg-success text-white">
+            Topic {{ topic.topic_no }}
+        </div>
+        <div class="card-body">
+            <figure>
+                <blockquote class="blockquote">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <p class="mb-0">{{ topic.title }}</p>
+                        <div>
+                            <a href="{{ url_for('view_topic_file', topic_id=topic.id) }}" target="_blank"
+                                class="btn btn-info me-2 text-white">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                            <a href="{{ url_for('download_topic_file', topic_id=topic.id) }}" class="btn btn-secondary"
+                                style="background-color: gray;">
+                                <i class="bi bi-download"></i> Download
+                            </a>
+                        </div>
+                    </div>
+                </blockquote>
+                <figcaption class="blockquote-footer">
+                    {{ topic.subtitle }}
+                </figcaption>
+            </figure>
+        </div>
+    </div>
+
+    <div class="card shadow mt-2 mb-4">
+    <div class="card-header bg-primary text-white">
+        Assessment for Topic {{ topic.topic_no }} 
+        <i class="bi bi-patch-question float-end"></i>
+    </div>
+    <div class="card-body">
+        <div class="quiz d-flex justify-content-between align-items-center">
+            
+            <p class="text-muted mb-0">Test your understanding of this topic.</p>
+
+            {% if topic.assessments %}
+                {# If one or more assessments exist, show the 'Start Quiz' button(s). #}
+                {% for assessment in topic.assessments %}
+                    <a href="{{ url_for('take_quiz_page', quiz_id=assessment.id) }}" class="ms-auto">
+                        <button class="btn quiz-btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Start Quiz
+                        </button>
+                    </a>
+                {% endfor %}
+            {% else %}
+                {# If no assessments are available for this topic, display a message. #}
+                <span class="text-warning ms-auto">
+                    No assessment available yet.
+                </span>
+            {% endif %}
+            
+        </div>
+    </div>
+</div>
+
+
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-info mt-3">
+        No uploaded topics for this course yet.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
