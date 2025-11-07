@@ -4,8 +4,7 @@ from database.models import Document
 import logging 
 from sqlalchemy import select
 
-
-def save_document(document_name: str, file_hash: str, index_path: str, document_uuid: str):
+def save_document(document_name: str, file_hash: str, index_path: str, document_uuid: str, user_id: int):
     """
     Saves the document metadata (including the file hash) to the database.
     
@@ -28,7 +27,8 @@ def save_document(document_name: str, file_hash: str, index_path: str, document_
             filename=document_name, 
             file_hash=file_hash,
             index_path=index_path,
-            document_uuid=document_uuid
+            document_uuid=document_uuid,
+            uploaded_by_user_id=user_id
             )
         session.add(new_doc)
         session.commit()

@@ -3,6 +3,7 @@ import tempfile
 import uuid
 import logging
 from pathlib import Path
+import json
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
@@ -14,15 +15,20 @@ import google.generativeai as genai
 
 # --- Local Imports ---
 from core.processing import load_and_chunk, get_or_create_vector_store, calculate_file_hash
-from core.langchain_chain import build_chain
+from core.mcq_chain import build_chain
 from database.session import initialize_database
+from database.check_user_role import Depends, check_user_role
 from database.document_db import save_document, retrieve_all_documents_metadata
+from database.generated_questions import save_generated_questions
+from database.session import get_db
+from sqlalchemy.orm import Session
 from routes.auth import auth_router
 from utils.flash import get_flashed_messages
 from routes.faculty import dashboard, courses, cilos as faculty_cilos
 from routes.faculty.upload_topic import faculty_upload_router
 from routes.student import student_dashboard_router, student_courses_router, cilos as student_cilos
 from routes.student.topics import student_router
+
 
 # ----------------------------
 # 🔧 Basic Setup & Config
@@ -102,7 +108,12 @@ def faculty_mcq_form_alt(request: Request):
 
 
 @app.post("/upload-pdf/")
-async def upload_pdf(file: UploadFile = File(...)) -> JSONResponse:
+async def upload_pdf(
+    file: UploadFile = File(...),
+    # 🌟 NEW: user_id is retrieved from the session dependency
+    user_id: int = Depends(check_user_role),
+    db: Session = Depends(get_db)
+) -> JSONResponse:
     """
     Uploads a PDF file, processes or loads it from cache, stores metadata,
     and returns a unique identifier (file hash).
@@ -154,8 +165,10 @@ async def upload_pdf(file: UploadFile = File(...)) -> JSONResponse:
                     original_filename, 
                     file_hash,
                     str(index_path), 
-                    document_uuid 
-                )
+                    document_uuid,
+                    user_id  
+                )   
+
                 logging.info(f"✅ DB: Document '{original_filename}' saved successfully.")
             except Exception as db_e:
                 logging.error(f"DB FAILURE: Could not save document metadata. Error: {db_e}")
@@ -182,64 +195,71 @@ async def upload_pdf(file: UploadFile = File(...)) -> JSONResponse:
             logging.info(f"🧹 Temporary file removed: {temp_file_path}")
 
 
+
 @app.post("/generate-question/")
 async def generate_question(
     pdf_hash_id: str = Form(..., description="The unique hash ID returned by /upload-pdf/"),
-    topics: str = Form(..., description="Comma-separated list of topics to generate questions on"),
-    num_questions: int = Form(..., description="Number of questions to generate (1-10)")
+    topics: str = Form(..., description="Comma-separated list of topics"),
+    num_questions: int = Form(..., description="Number of questions (1-10)"),
+    co_tags: str = Form(..., description="Comma-separated CO tags (e.g., CO1,CO2)"),
 ) -> JSONResponse:
-    """
-    Generates multiple-choice questions for given topics using an existing indexed document.
-    This is the RETRIEVAL and GENERATION step of the RAG process.
-    """
-    # --- Input Validation ---
-    if num_questions <= 0 or num_questions > 10:
+
+    # Validate number of questions
+    if not 1 <= num_questions <= 10:
         raise HTTPException(status_code=400, detail="Number of questions must be between 1 and 10.")
-    
+
+    # Parse topics and CO tags
     topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+    co_tag_list = [t.strip().upper() for t in co_tags.split(",") if t.strip()]
+
     if not topic_list:
         raise HTTPException(status_code=400, detail="No valid topics provided.")
-    
-    # --- Vector Store Loading ---
+
+    if not co_tag_list:
+        raise HTTPException(status_code=400, detail="No valid CO tags provided.")
+
+    # Load FAISS index
     index_path = CACHE_DIR / pdf_hash_id
     if not index_path.exists():
-        raise HTTPException(status_code=404, detail=f"Document index not found for hash ID: {pdf_hash_id}. Please upload the document first.")
-    
-    # Load the retriever from the existing index
+        raise HTTPException(status_code=404, detail="Document index not found. Upload PDF first.")
+
     retriever, _ = get_or_create_vector_store(str(index_path))
 
-    # --- Retrieval and Generation Logic ---
+    # Retrieve chunks for each topic
     all_retrieved_chunks = []
-    
-    # Retrieve content for each requested topic
     for topic in topic_list:
-        # Retrieve relevant documents/chunks for the topic (limiting to 2 per topic)
-        retrieved = retriever.get_relevant_documents(topic)[:2]
-        all_retrieved_chunks.extend(retrieved)
+        docs = retriever.get_relevant_documents(topic)[:2]
+        all_retrieved_chunks.extend(docs)
 
-
-    # Combine the content of all retrieved chunks into a single string for the LLM context
-    merged_context = "\n\n".join([doc.page_content for doc in all_retrieved_chunks])
-
-    # --- Prepare the list of chunk texts to return ---
-    # Extract the 'page_content' from each retrieved document object
-    retrieved_chunk_texts = [doc.page_content for doc in all_retrieved_chunks]
+    merged_context = "\n\n".join([d.page_content for d in all_retrieved_chunks])
+    retrieved_chunk_texts = [d.page_content for d in all_retrieved_chunks]
 
     if not merged_context.strip():
         raise HTTPException(status_code=400, detail="No relevant content found for the given topics.")
 
-    # --- Chain Execution ---
+    # Run LLM chain
     chain = build_chain()
-    # Run the chain with the retrieved context and user inputs
-    response_text = chain.run(topic_list, merged_context, num_questions=num_questions)
+    try:
+        generated_data = chain.run(
+            topics=topic_list,
+            context=merged_context,
+            num_questions=num_questions,
+            co_tags=co_tag_list
+        )
 
+        questions_list = generated_data.get("questions", [])
+    
+    except Exception as e:
+        logging.error(f"Chain error: {e}")
+        raise HTTPException(status_code=500, detail="AI failed to generate questions")
+
+    # Return successful JSON
     return JSONResponse({
         "status": "success",
         "pdf_hash_id": pdf_hash_id,
         "topics": topic_list,
-        "generated_mcqs": response_text.strip(),
-        "retrieved_chunks_count": len(all_retrieved_chunks),
-        "retrieved_chunk_texts": retrieved_chunk_texts
+        "generated_mcqs": questions_list,
+        "retrieved_chunks_count": len(all_retrieved_chunks)
     })
 
 

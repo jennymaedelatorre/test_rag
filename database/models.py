@@ -1,4 +1,5 @@
 import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
 from sqlalchemy import Integer, Column, String, DateTime, Text, ForeignKey, Float
 from sqlalchemy.orm import relationship
@@ -43,6 +44,21 @@ class User(Base):
     courses = relationship("Course", back_populates="instructor")
 
     downloads = relationship("DownloadHistory", back_populates="user", cascade="all, delete")
+
+    # 🌟 NEW RELATIONSHIPS 🌟
+    # 1. Links User to Documents they uploaded
+    documents = relationship(
+        "Document", 
+        back_populates="uploader", 
+        cascade="all, delete-orphan" # Optional: Deletes docs if user is deleted
+    )
+
+    # 2. Links User to Questions they generated
+    generated_questions = relationship(
+        "GeneratedQuestion", 
+        back_populates="generator", 
+        cascade="all, delete-orphan" # Optional: Deletes questions if user is deleted
+    )
     
 
 class Course(Base):
@@ -122,21 +138,55 @@ class DownloadHistory(Base):
 # ... Document class ...
 class Document(Base):
     __tablename__ = "documents"
-
-    id = Column(Integer, primary_key=True, index=True) 
-    document_uuid = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    
+    document_uuid = Column(String, primary_key=True, unique=True, index=True, default=lambda: str(uuid.uuid4()))
     filename = Column(String, nullable=False)
     file_hash = Column(String, unique=True, index=True, nullable=False)
     index_path = Column(String, nullable=False) 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    uploader = relationship("User", back_populates="documents") 
+
+    generated_questions = relationship(
+        "GeneratedQuestion",
+        # This links to the 'source_document' relationship in the GeneratedQuestion model
+        back_populates="source_document", 
+        # Specifies how to handle cascading deletes/orphans
+        cascade="all, delete-orphan" 
+    )
+
     def to_dict(self):
-        """
-        Converts the model instance to a dictionary for API response, 
-        using 'hash_id' as the key required by the frontend selection logic.
-        """
         return {
-            "name": self.filename,
-            "hash_id": self.file_hash,
-            "document_uuid": self.document_uuid
+            "document_uuid": str(self.document_uuid),
+            "file_name": self.filename,
+            "file_hash": self.file_hash,
+            "uploaded_by_user_id": self.uploaded_by_user_id,
+            "created_at": self.created_at.isoformat()
         }
+    
+
+class GeneratedQuestion(Base):
+    __tablename__ = "generated_questions"
+    
+    # Primary Key
+    question_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Foreign Keys / Document Metadata
+    pdf_hash_id = Column(String, ForeignKey("documents.file_hash")) # Link to the indexed document
+    # Link to the User table using the numerical Primary Key (best practice)
+    user_id = Column(Integer, ForeignKey("users.id")) 
+    
+    # Question Data
+    question_text = Column(String, nullable=False)
+    options_json = Column(String, nullable=False) # Store the list of options as a JSON string
+    correct_answer = Column(String, nullable=False) # Store the correct answer text
+    co_tag = Column(String, nullable=False) # Store the Course Outcome tag (e.g., CO1)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    source_document = relationship("Document", back_populates="generated_questions") 
+    generator = relationship("User", back_populates="generated_questions")
+
+    
