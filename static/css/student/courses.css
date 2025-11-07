@@ -1,0 +1,63 @@
+.course-card {
+  border-radius: 12px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.course-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+
+.btn {
+    background-color: #198754;
+    color: white;
+    border: none;
+}
+
+.quiz-btn {
+    background-color:#0d6efd;
+    color: white;
+    border: none;
+}
+
+.btn:hover {
+    background-color: #157347;
+}
+
+.quiz-btn:hover {
+    transform: scale(1.03);
+    background-color: #0b66ed;
+}
+
+.download-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.card-download {
+  border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    /* background-color: aqua; */
+}
+
+.card-download:hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+/* cilo page */
+.cilo-card {
+  border-radius: 12px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.cilo-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
