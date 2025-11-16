@@ -99,13 +99,16 @@
 
     <div class="col-md-6 ">
       <div class="mb-5">
-        <div class="card shadow-sm border-0 p-4">
-          <div class="d-flex justify-content-center">
-            <div style="width: 500px; height: 260px;">
-              <canvas id="ciloProgressChart"></canvas>
-            </div>
+        {% for item in dashboard_course_data %}
+        <div class="card shadow-sm border-0 mb-4">
+          <div class="text-center mt-4">
+            {{ item.course.title }} — CO Performance
+          </div>
+          <div class="card-body" style="height: 280px;">
+            <canvas id="dashboardCoChart-{{ item.course.id }}"></canvas>
           </div>
         </div>
+        {% endfor %}
       </div>
     </div>
 
@@ -116,19 +119,36 @@
 
   <div class="text-center mb-4">
     <a href="/faculty/courses/" class="btn btn-primary me-2">Manage Courses</a>
-    <a href="#" class="btn btn-secondary">Create Quiz</a>
+    <a href="/faculty/generate_quiz" class="btn btn-secondary">Create Quiz</a>
   </div>
 
-  <div class="card border-0 shadow-sm">
+  <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white fw-bold">
       Recent Activity
     </div>
-    <div class="card-body">
+    <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+      {% if recent_activities %}
       <ul class="list-unstyled mb-0">
-        <li>📥 Uploaded Topic</li>
-        <li>📝 Reviewed 15 student quiz submissions</li>
-        <li>✅ Created a new quiz for "Math 101"</li>
+        {% for act in recent_activities %}
+        <li class="mb-2 d-flex justify-content-between align-items-center">
+          <div>
+            {% if act.type == 'upload_topic' %}
+            📥
+            {% elif act.type == 'create_question' %}
+            📝
+            {% else %}
+            🔔
+            {% endif %}
+            {{ act.message }}
+          </div>
+          <small class="text-muted">{{ act.timestamp.strftime('%Y-%m-%d') }}</small>
+        </li>
+        {% endfor %}
       </ul>
+      {% else %}
+      <p class="text-muted mb-0">No recent activity yet.</p>
+      {% endif %}
+
     </div>
   </div>
 
@@ -144,36 +164,66 @@
 
           setTimeout(() => {
             alert.remove();
-          }, 500); // wait for fade animation
-        }, 3000); // 3 seconds display time
+          }, 500);
+        }, 3000);
       });
     });
   </script>
 
 
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const counters = document.querySelectorAll(".card-text");
+ <script>
+document.addEventListener("DOMContentLoaded", function() {
 
-      counters.forEach(counter => {
-        const target = +counter.textContent.trim();
-        const duration = 1000; // milliseconds
-        const startTime = performance.now();
+    {% for item in dashboard_course_data %}
+    const ctxDash{{ item.course.id }} = document
+        .getElementById("dashboardCoChart-{{ item.course.id }}")
+        .getContext("2d");
 
-        const animate = (now) => {
-          const progress = Math.min((now - startTime) / duration, 1);
-          counter.textContent = Math.floor(progress * target);
-
-          if (progress < 1) requestAnimationFrame(animate);
-          else counter.textContent = target;
-        };
-
-        requestAnimationFrame(animate);
-      });
+    new Chart(ctxDash{{ item.course.id }}, {
+        type: "bar",
+        data: {
+            labels: {{ item.co_avg.keys() | list | tojson }},
+            datasets: [{
+                label: "Average CO Achievement (%)",
+                data: {{ item.co_avg.values() | list | tojson }},
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(255, 193, 7, 0.8)',
+                    'rgba(23, 162, 184, 0.8)'
+                ],
+                borderColor: [
+                    'transparent',
+                    'transparent',
+                    'transparent'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',  
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    min: 0,
+                    max: 100,
+                    ticks: { callback: value => value + "%" },
+                    title: { display: true, text: "Average CO Achievement (%)" }
+                },
+                y: {
+                    title: { display: true, text: "CO" }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
     });
-  </script>
+    {% endfor %}
 
+});
+</script>
 
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

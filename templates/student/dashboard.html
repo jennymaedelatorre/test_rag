@@ -3,6 +3,9 @@
 {% block title %}Student Dashboard{% endblock %}
 
 {% block content %}
+<!-- Include Chart.js library for rendering the canvas charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+
 <!-- Top Bar -->
 <div class="d-flex justify-content-between align-items-center mb-4 px-3">
   <div class="me-3">
@@ -55,7 +58,7 @@
         <i class="fa-solid fa-list-check fa-2x text-white me-5"></i>
         <div class="text-white">
           <h5 class="card-title mb-1">Quizzes Taken</h5>
-          <p class="card-text mb-0" style="font-size: 15px;">5 Completed</p>
+          <p class="card-text mb-0" style="font-size: 15px;">{{ completed_quizzes }} Completed</p>
         </div>
       </div>
     </div>
@@ -65,53 +68,150 @@
     <div class="card shadow border-0 bg-warning">
       <div class="card-body d-flex align-items-center py-4">
         <i class="fa-solid fa-chart-line fa-2x text-white me-5"></i>
+        {% for c in course_progress_data %}
         <div class="text-white">
-          <h5 class="card-title mb-1">Progress</h5>
-          <p class="card-text mb-0" style="font-size: 15px;">75%</p>
+          <h5 class="card-title mb-1">Course Progress</h5>
+          <p class="card-text mb-0" style="font-size: 15px;">{{ c.progress }}%</p>
+        {% endfor %}
         </div>
       </div>
     </div>
   </div>
 </div>
 
-
-{% for course in courses %}
 <div class="px-3 mb-4 mt-5">
   <h4 class="mb-3" style="font-size: 20px;">Course Overview</h4>
   <div class="row g-3">
     <div class="col-md-6">
-      <div class="card border-0 shadow-sm">
+      <div class="card border-0 shadow" style="height: 425px;">
         <img src="/static/imgs/c2.jpg" class="card-img-top" alt="Programming Course Image"
-             style="height: 250px; object-fit: cover;">
+          style="height: 300px; object-fit: cover;">
+        {% for course in courses %}
         <div class="card-body">
           <h5 class="card-title">{{ course.title }}</h5>
           <div class="d-flex justify-content-start">
-            <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle" style="width: 30px; height: 30px; object-fit: cover;">
+            <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle"
+              style="width: 30px; height: 30px; object-fit: cover;">
             <p class="card-text text-muted ms-2 mt-1">{{ course.instructor.full_name }}</p>
           </div>
         </div>
+        {% endfor %}
       </div>
     </div>
+    <!-- CO PROGRESS CHART SECTION (Polar Area Chart) -->
+    <div class="col-md-6">
+      <div class="card shadow border-0">
+        <div class="card-body p-4">
+          <h5 class="card-title mb-4">Course Outcome (CO) Mastery Overview</h5>
+          <div class="d-flex justify-content-center" style="max-height: 400px;">
+            <canvas id="coProgressChart" style="max-width: 400px;"></canvas>
+          </div>
+          <small class="text-muted fst-italic mt-2 d-block text-center">
+            Visual representation of your mastery across all Course Outcomes.
+          </small>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
-{% endfor %}
+
+
+
+
 
 <script>
-    // Automatically hide flash messages after 3 seconds (3000ms)
-    window.addEventListener('DOMContentLoaded', () => {
-      const alerts = document.querySelectorAll('.alert');
-      alerts.forEach(alert => {
-        setTimeout(() => {
-          alert.classList.remove('show');
-          alert.classList.add('fade');
+  // Initialize the CO Progress Chart 
+  function initializeCOChart() {
 
+    const ctx = document.getElementById('coProgressChart');
+    if (!ctx) return;
 
-          setTimeout(() => {
-            alert.remove();
-          }, 500); // wait for fade animation
-        }, 3000); // 3 seconds display time
-      });
+    
+    const labels = JSON.parse('{{ co_labels | tojson | safe }}');
+  
+    const values = JSON.parse('{{ co_values | tojson | safe }}');
+
+  // If no data, stop the chart
+  if (!labels.length || !values.length) {
+    console.warn("No CO data found for progress chart.");
+    return;
+  }
+
+  new Chart(ctx, {
+    type: 'polarArea',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Mastery Level (%)',
+        data: values,
+        backgroundColor: [
+          'rgba(40, 167, 69, 0.8)',
+          'rgba(255, 193, 7, 0.8)',
+          'rgba(23, 162, 184, 0.8)',
+          'rgba(220, 53, 69, 0.8)',
+          'rgba(102, 16, 242, 0.8)',
+          'rgba(13, 110, 253, 0.8)'
+        ],
+        borderColor: [
+          '#28a745',
+          '#ffc107',
+          '#17a2b8',
+          '#dc3545',
+          '#6610f2',
+          '#0d6efd'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          pointLabels: {
+            display: true,
+            centerPointLabels: true,
+            font: { size: 14 }
+          },
+          suggestedMin: 0,
+          suggestedMax: 100,
+          ticks: {
+            callback: (value) => value + '%'
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { font: { size: 14 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              return `${context.label}: ${context.raw}% Mastery`;
+            }
+          }
+        }
+      }
+    }
+  });
+    }
+
+  // Hide flash messages after 3 seconds
+  window.addEventListener('DOMContentLoaded', () => {
+    initializeCOChart();
+
+    document.querySelectorAll('.alert').forEach(alert => {
+      setTimeout(() => {
+        alert.classList.remove('show');
+        alert.classList.add('fade');
+
+        setTimeout(() => alert.remove(), 500);
+      }, 3000);
     });
-  </script>
+  });
+</script>
+
 
 {% endblock %}

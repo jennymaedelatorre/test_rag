@@ -4,7 +4,7 @@
 
 {% block content %}
 <!-- Top Bar -->
-<div class="d-flex justify-content-between align-items-center mb-4 px-3">
+<div class="d-flex justify-content-between align-items-center mb-4 ">
   <div class="me-3">
      Hello, <span class="fw-bold">{{ user_full_name }}</span>!
   </div>
@@ -23,9 +23,12 @@
   </div>
 </div>
 
-<h4 class="px-3 mb-4 text-start">Courses Handled</h4>
 
-<div class="row px-3">
+  <h4 class="text-start">🎓 Courses Handled</h4>
+  <hr style="width: 450px;">
+  <p class="text-secondary fst-italic" style="font-size: 16px;">Overview of all courses you’re currently handling. Select a course to manage topics, view COs, or upload a topic.</p>
+
+<div class="row mt-4">
   {% for course in courses %}
   <div class="col-md-6 mb-4">
     <div class="card border-0 shadow-sm course-card h-100">

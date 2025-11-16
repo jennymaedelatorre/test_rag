@@ -1,0 +1,61 @@
+{% extends 'student/base.html' %}
+{% block title %}Quiz Review{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="me-3">
+    Hello, <span class="fw-bold">{{ user_full_name }}</span>!
+  </div>
+
+  <form class="d-flex flex-grow-1 me-3" role="search">
+    <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
+    <button class="btn btn-outline-success" type="submit">
+      <i class="fa fa-search"></i>
+    </button>
+  </form>
+
+  <div class="d-flex align-items-center">
+    <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
+    <img src="/static/imgs/student1.jpg" alt="Profile" class="rounded-circle"
+      style="width: 40px; height: 40px; object-fit: cover;">
+  </div>
+</div>
+
+<div class="d-flex justify-content-between mt-4 ms-1">
+  <h4 class="text-success">Quiz Review</h4>
+  <a href="{{ url_for('view_course_topics_student', course_id=1) }}" class="btn btn-success text-white me-2">Back to Topic</a>
+</div>
+
+<p class="ms-2">Score: {{ score }} / {{ total }}</p>
+
+{% for q in review_data %}
+<div 
+  class="p-4 mb-4 rounded shadow bg-white {% if q.user_answer == q.correct_answer %}border border-1 border-success{% else %}border border-1 border-danger{% endif %}"
+>
+  <div class="d-flex justify-content-between">
+    <p><strong>Q{{ loop.index }}:</strong> {{ q.question_text }}</p>
+    <p class="me-4 fst-italic">CO Tag: <b>{{ q.co_tag }}</b></p>
+  </div>
+
+  <ul class="mb-4">
+    {% for opt in q.options %}
+      <li 
+        {% if opt == q.correct_answer %} class="text-success fw-bold" {% endif %}
+        {% if opt == q.user_answer and opt != q.correct_answer %} style="color: red; font-weight: bold;" {% endif %}
+      >
+        {{ opt }}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <p class="mb-0">Your Answer: 
+    <i class="{% if q.user_answer == q.correct_answer %}text-success{% else %}text-danger{% endif %}">
+      {{ q.user_answer }}
+    </i>
+  </p>
+  <p class="mt-0">Correct Answer: <b class="text-success">{{ q.correct_answer }}</b></p>
+</div>
+{% endfor %}
+
+{% endblock %}

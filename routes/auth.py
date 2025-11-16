@@ -3,15 +3,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.templating import Jinja2Templates
 
-# Local Imports
 from database.models import User
 from database.session import get_db
 
 from utils.flash import flash, get_flashed_messages
 
-# Templates setup
-templates = Jinja2Templates(directory="templates")
 
+templates = Jinja2Templates(directory="templates")
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # ----------------- Dashboard Redirect Helper -----------------

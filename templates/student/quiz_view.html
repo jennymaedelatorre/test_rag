@@ -1,0 +1,144 @@
+{% extends 'student/base.html' %}
+{% block title %}Quiz: {{ topic_title }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+    <div class="d-flex justify-content-between align-items-center border-bottom pb-3">
+        <h1 class="text-success fw-bold mb-0">{{ topic_title }} Quiz</h1>
+        <p class="text-muted mb-0">Topic ID: {{ topic_id }}</p>
+    </div>
+    <p class="text-secondary fst-italic mt-2 mb-5">{{ topic_subtitle }}</p>
+
+    {% if questions %}
+    <div class="alert alert-warning text-center">
+        <h5>⏱️ Time Remaining: <span id="quizTimer" class="fw-bold text-danger">--:--</span></h5>
+    </div>
+
+    <form id="studentQuizForm" method="POST">
+        <input type="hidden" name="topic_id" value="{{ topic_id }}">
+        <input type="hidden" name="attempt_id" value="{{ attempt_id }}">
+
+        <div id="quiz-container">
+            {% for question in questions %}
+            <div class="card shadow-sm mb-4 border-0" data-question-id="{{ question.question_id }}">
+                <div class="card-header bg-white border-bottom-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-dark">
+                        <span class="badge bg-success me-2">{{ loop.index }}</span>
+                        {{ question.question_text }}
+                    </h6>
+                </div>
+                <div class="card-body pt-2">
+                    {% for option in question.options %}
+                    <div class="form-check py-2 ps-4" style="border-bottom: 1px dashed #eee;">
+                        <input class="form-check-input" type="radio" 
+                               name="answer_{{ question.question_id }}" 
+                               id="option_{{ question.question_id }}_{{ loop.index }}" 
+                               value="{{ option | trim }}" required>
+                        <label class="form-check-label w-100" for="option_{{ question.question_id }}_{{ loop.index }}">
+                            {{ option }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="d-grid mt-5">
+            <button type="submit" id="submitQuizBtn" class="btn btn-success btn-lg shadow-lg">
+                <i class="bi bi-send-fill me-2"></i> Submit Quiz
+            </button>
+        </div>
+    </form>
+    {% else %}
+    <div class="alert alert-warning text-center mt-5" role="alert">
+        <h4 class="alert-heading">No Questions Available</h4>
+        <p>It looks like this quiz has not been generated or saved by the faculty yet.</p>
+        <hr>
+        <a href="" class="btn btn-warning">Back to Topics</a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const quizForm = document.getElementById("studentQuizForm");
+    const submitBtn = document.getElementById("submitQuizBtn");
+    let isFormDirty = false;
+    
+    const endTime = new Date("{{ end_time_ph }}");
+    const timerDisplay = document.getElementById("quizTimer");
+
+    const timerInterval = setInterval(() => {
+        const now = new Date();
+        const diff = endTime - now;
+
+        if (diff <= 0) {
+            clearInterval(timerInterval);
+            timerDisplay.textContent = "00:00";
+            alert("⏰ Time's up! Submitting your quiz automatically...");
+            quizForm.submit();
+            return;
+        }
+
+        const minutes = Math.floor(diff / 1000 / 60);
+        const seconds = Math.floor((diff / 1000) % 60);
+        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    }, 1000);
+
+    if (quizForm) {
+        quizForm.addEventListener("change", () => { isFormDirty = true; });
+
+        window.addEventListener("beforeunload", (e) => {
+            if (isFormDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        quizForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Submitting...';
+            isFormDirty = false;
+
+            const formData = new FormData(quizForm);
+            const topicId = formData.get('topic_id');
+            const attemptId = formData.get('attempt_id'); 
+            const answers = {};
+
+            for (const [key, value] of formData.entries()) {
+                if (key.startsWith('answer_')) {
+                    const qid = key.replace('answer_', '');
+                    answers[qid] = value;
+                }
+            }
+
+            try {
+                const response = await fetch('/student/quiz/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic_id: parseInt(topicId), attempt_id: attemptId, answers })
+                });
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    window.location.href = `/student/quiz/results/${topicId}?score=${data.score}&total=${data.total}`;
+                } else {
+                    alert(`Submission failed: ${data.detail || 'Server error'}`);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-send-fill me-2"></i> Submit Quiz';
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send-fill me-2"></i> Submit Quiz';
+            }
+        });
+    }
+});
+</script>
+
+{% endblock %}

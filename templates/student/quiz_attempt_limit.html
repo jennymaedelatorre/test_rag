@@ -1,0 +1,73 @@
+{% extends 'student/base.html' %}
+{% block title %}Quiz Attempts Reached{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="d-flex justify-content-between align-items-center mb-4 px-3">
+  <div class="me-3">
+    Hello, <span class="fw-bold">{{ user_full_name }}</span>!
+  </div>
+
+  <!-- Search Bar -->
+  <form class="d-flex flex-grow-1 me-3" role="search">
+    <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
+    <button class="btn btn-outline-success" type="submit">
+      <i class="fa fa-search"></i>
+    </button>
+  </form>
+
+  <!-- Notification and Profile -->
+  <div class="d-flex align-items-center">
+    <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
+    <img src="/static/imgs/student1.jpg" alt="Profile" class="rounded-circle"
+      style="width: 40px; height: 40px; object-fit: cover;">
+  </div>
+</div>
+
+
+<div class="container py-3 d-flex justify-content-start">
+    <div class="col-md-12">
+
+        <div class=" border-danger  mb-4">
+            <div class="">
+                <h4 class="mb-0 text-danger fst-normal fw-bolder"><i class="bi bi-exclamation-triangle-fill"></i>Maximum Attempts Reached</h4>
+                <hr>
+            </div>
+            <div class="card-body">
+                <p class="lead mb-0 fst-italic text-muted">You have reached the maximum of <strong>{{ max_attempts }}</strong> attempts for the quiz: {{ topic.title }}</p>
+                <p class="text-secondary mb-4 fst-italic">You will not be able to start or resume the quiz. Please contact your instructor or administrator for options on retaking the quiz.</p>
+
+                {% if attempts %}
+                <div class="row g-3">
+                    {% for attempt in attempts %}
+                    <div class="col-md-6">
+                        <div class="card border-secondary justify-content-center shadow-sm" style="height: 230px;">
+                            <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+                                <span class="badge bg-primary mb-2">Attempt {{ attempt.attempt_number }}</span>
+                                <p class="mb-1">Score: <strong>{{ attempt.score }}/{{ attempt.total_questions }}</strong></p>
+                                <span class="text-muted small">
+                                    Submitted at: {{ attempt.start_time_ph.strftime("%b %d, %Y %I:%M %p") }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form action="/student/quiz/review/{{ attempt_id }}" method="get">
+                            <button type="submit" class="btn btn-primary">Review Answers</button>
+                        </form>
+
+                <div class="mt-4 text-center">
+                    <a href="{{ url_for('view_course_topics_student', course_id=topic.course_id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left-circle me-2"></i> Back to Topics
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

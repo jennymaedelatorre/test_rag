@@ -1,17 +1,33 @@
 {% extends 'faculty/base.html' %}
 
-{% block title %}Upload Topics{% endblock %}
+{% block title %}Upload Course Topics{% endblock %}
 
 {% block content %}
 
+<style>
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.75);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+</style>
+
 <!-- Top Bar -->
 <div class="d-flex justify-content-between align-items-center mb-4 px-3">
-    <div class="me-3">
+    <div>
         Hello, <span class="fw-bold">{{ user_full_name }}</span>!
     </div>
 
-    <form class="d-flex flex-grow-1 me-3" role="search">
-        <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
+    <form class="d-flex flex-grow-1 mx-3" role="search">
+        <input class="form-control me-2" type="search" placeholder="Search topics..." aria-label="Search">
         <button class="btn btn-outline-success" type="submit">
             <i class="fa fa-search"></i>
         </button>
@@ -20,129 +36,139 @@
     <div class="d-flex align-items-center">
         <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
         <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle"
-            style="width: 40px; height: 40px; object-fit: cover;">
+             style="width: 40px; height: 40px; object-fit: cover;">
     </div>
 </div>
 
+<div class="container mt-4">
+    <div>
+        <h3 class="">📖 Course Learning Materials</h3>
+        <hr class="" style="width: 450px;">
+        <p class="text-secondary fst-italic ms-2" style="font-size: 16px;">
+            Upload and manage your course learning materials in PDF format. 
+            Each file will be automatically processed and indexed <br> for quiz generation.
+        </p>
+    </div>
 
-<div class="container mt-2">
-    <h4 class="mb-4">📚 Course – Learning Materials</h4>
-
-    <!-- flash message -->
+    <!-- Flash Message -->
     {% if flashed.message %}
     <div class="alert alert-{{ flashed.category }} alert-dismissible fade show mt-3" role="alert">
-        <h6 class="mb-1">
-            {{ flashed.icon | safe }} <strong>{{ flashed.title }}</strong>
-        </h6>
+        <h6 class="mb-1">{{ flashed.icon | safe }} <strong>{{ flashed.title }}</strong></h6>
         <p class="mb-0">{{ flashed.message }}</p>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     {% endif %}
 
-
-
-
+    <!-- Upload Form -->
     <div class="card shadow">
-        <div class="card-header bg-success text-white">
-            <i class="bi bi-journal-plus me-2"></i>Create New Topic
+        <div class="card-header bg-success text-white p-3">
+            <span class="ms-3">Upload New Topic</span>
         </div>
-        <div class="card-body">
-            <form action="{{ url_for('upload_topic', course_id=course_id) }}" method="post"
-                enctype="multipart/form-data">
+        <div class="card-body p-4">
+            <form action="{{ url_for('upload_topic', course_id=course_id) }}" method="post" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label for="topicNumber" class="form-label ms-2">Topic No.</label>
+                        <input type="number" class="form-control" id="topicNumber" name="topic_no" placeholder="1" required>
+                    </div>
 
-                <div class="mb-3">
-                    <label for="topicNumber" class="form-label">Topic Number</label>
-                    <input type="number" class="form-control" id="topicNumber" name="topic_no" placeholder="e.g., 1"
-                        required>
+                    <div class="col-md-10">
+                        <label for="topicTitle" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="topicTitle" name="title"
+                               placeholder="e.g., Introduction to Programming" required>
+                    </div>
+
+                    <div class="col-12">
+                        <label for="topicSubtitle" class="form-label ms-2">Description</label>
+                        <textarea class="form-control" id="topicSubtitle" name="subtitle" rows="3"
+                                  placeholder="Briefly describe the topic..."></textarea>
+                    </div>
+
+                    <div class="col-12">
+                        <label for="file_name" class="form-label ms-2">Upload Material (PDF)</label>
+                        <input class="form-control" type="file" id="file_name" name="file" accept=".pdf" required>
+                        <small class="text-muted ms-2">Accepted format: PDF only</small>
+                    </div>
                 </div>
 
-                <div class="mb-3">
-                    <label for="topicTitle" class="form-label">Topic Title</label>
-                    <input type="text" class="form-control" id="topicTitle" name="title"
-                        placeholder="e.g., Variables and Data Types" required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="topicSubtitle" class="form-label">Topic Description</label>
-                    <textarea class="form-control" id="topicSubtitle" name="subtitle" rows="3"
-                        placeholder="Briefly describe the topic..."></textarea>
-                </div>
-
-                <div class="mb-3">
-                    <label for="quizFile" class="form-label">Upload Material</label>
-                    <input class="form-control" type="file" id="quizFile" name="file" required>
-                </div>
-
-                <button type="submit" class="btn btn-success">Upload Topic</button>
+                <button type="submit" class="btn btn-success mt-3" id="uploadBtn">
+                    <span id="uploadBtnText">
+                        <i class="fa-solid fa-upload me-1"></i> Upload Topic
+                    </span>
+                    <span id="uploadSpinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true"
+                        style="display: none;"></span>
+                </button>
             </form>
         </div>
     </div>
 
     <hr>
 
+    <!--  Uploaded Materials -->
     <div class="card shadow mt-3">
         <div class="card-header bg-light">
-            <i class="bi bi-folder2-open me-2"></i>Uploaded Materials
+            <i class="bi bi-folder2-open me-2"></i>Uploaded Topics
         </div>
         <div class="card-body">
             <ul class="list-group">
                 {% if topics %}
                 {% for topic in topics %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <strong>Topic {{ topic.topic_no }} – {{ topic.title }}</strong>
+                    <div>
+                        <strong>Topic {{ topic.topic_no }} – {{ topic.title }}</strong>
+                        {% if topic.subtitle %}
+                        <br><small class="text-muted">{{ topic.subtitle }}</small>
+                        {% endif %}
+                    </div>
                     <span>
                         <a href="{{ url_for('view_topic_file', topic_id=topic.id) }}" target="_blank"
-                            class="btn btn-sm btn-secondary me-2">
+                           class="btn btn-sm btn-secondary me-2">
                             <i class="fa-solid fa-eye"></i> View
                         </a>
 
-                        <button type="button" class="btn btn-sm btn-primary me-2" data-bs-toggle="modal"
-                            data-bs-target="#updateTopicModal{{ topic.id }}">
-                            <i class="fa-solid fa-pen-to-square"></i> Update
+                        <button type="button" class="btn btn-sm btn-primary me-2"
+                                data-bs-toggle="modal" data-bs-target="#updateTopicModal{{ topic.id }}">
+                            <i class="fa-solid fa-pen-to-square"></i> Edit
                         </button>
 
-                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal"
-                            data-bs-target="#deleteModal{{ topic.id }}">
+                        <button type="button" class="btn btn-sm btn-danger"
+                                data-bs-toggle="modal" data-bs-target="#deleteModal{{ topic.id }}">
                             <i class="fa-solid fa-trash"></i> Delete
                         </button>
                     </span>
                 </li>
 
-                <!-- Update Topic Modal -->
+                <!--  Update Topic Modal -->
                 <div class="modal fade" id="updateTopicModal{{ topic.id }}" tabindex="-1"
-                    aria-labelledby="updateTopicLabel{{ topic.id }}" aria-hidden="true">
+                     aria-labelledby="updateTopicLabel{{ topic.id }}" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
-                            <form action="{{ url_for('update_topic', topic_id=topic.id) }}" method="POST"
-                                enctype="multipart/form-data">
+                            <form action="{{ url_for('update_topic', topic_id=topic.id) }}" method="POST" enctype="multipart/form-data">
                                 <div class="modal-header">
-                                    <h5 class="modal-title" id="updateTopicLabel{{ topic.id }}">Update Topic {{
-                                        topic.topic_no }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                        aria-label="Close"></button>
+                                    <h5 class="modal-title" id="updateTopicLabel{{ topic.id }}">
+                                        Update Topic {{ topic.topic_no }}
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-3">
                                         <label class="form-label">Title</label>
-                                        <input type="text" name="title" class="form-control" value="{{ topic.title }}"
-                                            required>
+                                        <input type="text" name="title" class="form-control" value="{{ topic.title }}" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Subtitle</label>
-                                        <input type="text" name="subtitle" class="form-control p-3"
-                                            value="{{ topic.subtitle }}">
+                                        <label class="form-label">Description</label>
+                                        <textarea name="subtitle" class="form-control" rows="3">{{ topic.subtitle }}</textarea>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Replace File (optional)</label>
-                                        <input type="file" name="file" class="form-control mb-2">
-                                        {% if topic.quiz_file %}
-                                        <small class="text-muted ms-3">Current file: {{ topic.quiz_file }}</small>
+                                        <label class="form-label">Replace Material (optional)</label>
+                                        <input type="file" name="file" class="form-control mb-2" accept=".pdf">
+                                        {% if topic.material_file %}
+                                        <small class="text-muted">Current: {{ topic.material_file }}</small>
                                         {% endif %}
                                     </div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary"
-                                        data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                     <button type="submit" class="btn btn-primary">Save Changes</button>
                                 </div>
                             </form>
@@ -150,51 +176,70 @@
                     </div>
                 </div>
 
-                <!-- Delete Modal -->
-                <div class="modal fade" id="deleteModal{{ topic.id }}" data-bs-backdrop="static"
-                    data-bs-keyboard="false" tabindex="-1" aria-labelledby="deleteModalLabel{{ topic.id }}"
-                    aria-hidden="true">
+                <!--  Delete Modal -->
+                <div class="modal fade" id="deleteModal{{ topic.id }}" tabindex="-1"
+                     aria-labelledby="deleteModalLabel{{ topic.id }}" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
-                            <div class="modal-header bg-danger">
-                                <h5 class="modal-title fs-5 text-white" id="deleteModalLabel{{ topic.id }}">Confirm
-                                    Delete</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                    aria-label="Close"></button>
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="deleteModalLabel{{ topic.id }}">Confirm Delete</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                Are you sure you want to delete topic <strong>{{ topic.title }}</strong>? This action
-                                cannot be undone.
+                                Are you sure you want to delete <strong>{{ topic.title }}</strong>? This cannot be undone.
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <form action="{{ url_for('delete_topic', topic_id=topic.id) }}" method="POST"
-                                    class="d-inline">
+                                <form action="{{ url_for('delete_topic', topic_id=topic.id) }}" method="POST">
                                     <button type="submit" class="btn btn-danger">Yes, Delete</button>
                                 </form>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 {% endfor %}
                 {% else %}
-                <li class="list-group-item text-muted text-center">No topics uploaded yet.</li>
+                <li class="list-group-item text-center text-muted">No topics uploaded yet.</li>
                 {% endif %}
             </ul>
         </div>
     </div>
 </div>
 
+
 <script>
-    // Automatically hide flash messages after 5 seconds (5000ms)
+document.addEventListener("DOMContentLoaded", () => {
+    const uploadForm = document.querySelector("form[action*='upload_topic']");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const spinner = document.getElementById("uploadSpinner");
+    const btnText = document.getElementById("uploadBtnText");
+
+    if (uploadForm) {
+        uploadForm.addEventListener("submit", () => {
+            
+            uploadBtn.disabled = true;
+
+            
+            btnText.innerHTML = `<i class="fa-solid fa-spinner me-1"></i> Processing...`;
+
+            
+            spinner.style.display = "inline-block";
+
+            uploadBtn.classList.add("opacity-75");
+        });
+    }
+});
+</script>
+
+<script>
+    // Auto-hide flash messages
     window.addEventListener('DOMContentLoaded', () => {
         const alerts = document.querySelectorAll('.alert');
         alerts.forEach(alert => {
             setTimeout(() => {
                 alert.classList.remove('show');
-                alert.classList.add('hide');
-                setTimeout(() => alert.remove(), 500); // remove from DOM after fade
+                alert.classList.add('fade');
+                setTimeout(() => alert.remove(), 500);
             }, 5000);
         });
     });

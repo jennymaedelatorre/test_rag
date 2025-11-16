@@ -1,23 +1,40 @@
 from fastapi import APIRouter, Request, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
-from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
 import os
-import shutil
-from typing import Optional
+import uuid
+import logging
+import tempfile
 import mimetypes
 from pathlib import Path
+import shutil
+from typing import Optional
 
 from database.session import get_db
 from database.models import Topic, Course, User
 from utils.flash import flash, get_flashed_messages
+from core.processing import load_and_chunk, get_or_create_vector_store, calculate_file_hash
+from database.check_user_role import check_user_role
 
+# ----------------------------
+# Router Setup
+# ----------------------------
 faculty_upload_router = APIRouter(prefix="/faculty", tags=["Faculty"])
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["get_flashed_messages"] = get_flashed_messages
 
-UPLOAD_DIR = "uploads/topics"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# ----------------------------
+# Directories
+# ----------------------------
+UPLOAD_DIR = Path("uploads/topics")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+CACHE_DIR = Path("./faiss_cache")
+CACHE_DIR.mkdir(exist_ok=True)
+
+TEMP_UPLOAD_DIR = Path(tempfile.gettempdir()) / "mcq_uploads"
+TEMP_UPLOAD_DIR.mkdir(exist_ok=True)
 
 # ----------------------------
 # Helper: User Dependency
@@ -25,16 +42,12 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 def get_current_faculty(request: Request, db: Session = Depends(get_db)):
     user_id = request.session.get("user_id")
     if not user_id:
-       
-        return RedirectResponse(url="/auth/login", status_code=303) 
-    
-    # Query the user 
+        return RedirectResponse(url="/auth/login", status_code=303)
+
     user = db.query(User).filter(User.id == user_id).first()
-    
     if not user or user.role != 'faculty':
         request.session.clear()
         return RedirectResponse(url="/auth/login", status_code=303)
-        
     return user
 
 # ---------------------------------
@@ -46,35 +59,29 @@ def upload_topic_page(course_id: int, request: Request, db: Session = Depends(ge
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    # 🔑 STEP 1: FETCH USER 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         request.session.clear()
         return RedirectResponse(url="/auth/login", status_code=303)
-    
-    user_full_name = user.full_name # Get the full name
 
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail=f"Course ID {course_id} not found.")
 
     topics = db.query(Topic).filter(Topic.course_id == course_id).order_by(Topic.topic_no).all()
-
     flashed = get_flashed_messages(request)
 
     return templates.TemplateResponse("faculty/upload_topic.html", {
         "request": request,
         "course_id": course_id,
         "topics": topics,
-        "user_full_name": user_full_name,
-         "flashed": flashed,
+        "user_full_name": user.full_name,
+        "flashed": flashed,
     })
+
 # ---------------------------------
 # POST: Upload Topic
 # ---------------------------------
-BASE_UPLOAD_DIR = Path("uploads/topics") 
-BASE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
 @faculty_upload_router.post("/course/{course_id}/upload_topic", name="upload_topic")
 async def upload_topic(
     course_id: int,
@@ -83,67 +90,122 @@ async def upload_topic(
     topic_no: int = Form(...),
     subtitle: str = Form(""),
     file: UploadFile = File(...),
+    user_id: int = Depends(check_user_role),
     db: Session = Depends(get_db)
 ):
+    """Handles topic creation + PDF indexing"""
     if not request.session.get("user_id"):
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    # Prepare file path
-    original_filename = Path(file.filename).name
-    server_file_path = BASE_UPLOAD_DIR / original_filename
+    temp_file_path = None  
 
-    print(f"DEBUG CHECKING PATH: {server_file_path.resolve()}")
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
-    # Check if file already exists
-    existing_topic = db.query(Topic).filter(
-        Topic.course_id == course_id,
-        Topic.file_path.like(f"%{original_filename}%")
-    ).first()
+        # Prepare paths
+        original_filename = Path(file.filename).name
+        server_file_path = UPLOAD_DIR / original_filename
 
-    if existing_topic:
+        # Count existing topics for this course
+        topic_count = db.query(Topic).filter(Topic.course_id == course_id).count()
+        if topic_count >= 10:
+            flash(
+                request,
+                f"Upload failed: This course has reached the maximum limit of 10 topics. You cannot add more.",
+                category="warning"
+            )
+            return RedirectResponse(
+                url=f"/faculty/course/{course_id}/upload_topic",
+                status_code=303
+            )
+
+
+        # Check for duplicates (topic_no or file_name)
+        existing_topic = db.query(Topic).filter(
+            Topic.course_id == course_id,
+            ((Topic.topic_no == topic_no) | (Topic.file_name == original_filename))
+        ).first()
+
+        if existing_topic:
+            reason = []
+            if existing_topic.topic_no == topic_no:
+                reason.append(f"Topic No. {topic_no}")
+            if existing_topic.file_name == original_filename:
+                reason.append(f"file '{original_filename}'")
+
+            flash(
+                request,
+                f"Upload failed: You already uploaded {', and '.join(reason)}.",
+                category="warning"
+            )
+            return RedirectResponse(
+                url=f"/faculty/course/{course_id}/upload_topic",
+                status_code=303
+            )
+
+        # Save file temporarily for indexing
+        temp_file_path = TEMP_UPLOAD_DIR / f"{uuid.uuid4()}-{original_filename}"
+        file_content = await file.read()
+        with open(temp_file_path, "wb") as buffer:
+            buffer.write(file_content)
+
+        # Generate file hash and FAISS index
+        file_hash = calculate_file_hash(str(temp_file_path))
+        document_uuid = str(uuid.uuid4())
+        index_path = CACHE_DIR / file_hash
+
+        if not index_path.exists():
+            docs = load_and_chunk(str(temp_file_path), document_id=document_uuid)
+            _, faiss_action = get_or_create_vector_store(str(index_path), docs=docs)
+        else:
+            faiss_action = "loaded_from_cache"
+
+        # Move file from temp to permanent storage
+        shutil.move(temp_file_path, server_file_path)
+
+        # Save to database
+        new_topic = Topic(
+            course_id=course_id,
+            topic_no=topic_no,
+            title=title,
+            subtitle=subtitle,
+            file_name=original_filename,
+            file_path=str(server_file_path),
+            file_hash=file_hash,
+            document_uuid=document_uuid,
+            uploaded_by=user_id
+        )
+        db.add(new_topic)
+        db.commit()
+        db.refresh(new_topic)
+
         flash(
             request,
-            f"Upload failed: Topic '{existing_topic.title}' (Topic No. {existing_topic.topic_no}) already exists with file '{original_filename}'.",
-            category="warning"
+            f"Topic '{title}' uploaded and indexed successfully! ({faiss_action})",
+            category="success"
         )
+
         return RedirectResponse(
             url=f"/faculty/course/{course_id}/upload_topic",
             status_code=303
         )
 
-    # Save file to disk
-    try:
-        with open(server_file_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-    except Exception as e:
-        print(f"File I/O Error: {e}")
-        raise HTTPException(status_code=500, detail="Could not save file to the server due to an I/O error.")
-
-    # Save topic to database
-    try:
-        new_topic = Topic(
-            topic_no=topic_no,
-            title=title,
-            subtitle=subtitle,
-            file_path=str(server_file_path),
-            course_id=course_id
-        )
-        db.add(new_topic)
-        db.commit()
-        db.refresh(new_topic)
     except Exception as e:
         db.rollback()
-        # Remove file if DB save fails
-        if server_file_path.exists():
-            os.remove(server_file_path)
-        print(f"Database save error: {e}")
-        raise HTTPException(status_code=500, detail="Database error. Topic could not be saved.")
+        logging.error(f"❌ Upload topic failed: {e}", exc_info=True)
+        flash(request, f"Upload failed: {str(e)}", category="danger")
+        return RedirectResponse(
+            url=f"/faculty/course/{course_id}/upload_topic",
+            status_code=303
+        )
 
-    flash(request, f"Topic '{title}' uploaded successfully!", category="success")
-    return RedirectResponse(
-        url=f"/faculty/course/{course_id}/upload_topic",
-        status_code=303
-    )
+    finally:
+        if temp_file_path and temp_file_path.exists():
+            os.remove(temp_file_path)
+
+
 
 # ---------------------------------
 # POST: Update Topic
@@ -218,7 +280,6 @@ def delete_topic(topic_id: int, request: Request, db: Session = Depends(get_db))
     db.delete(topic)
     db.commit()
 
-    # Flash message
     flash(request, f"Topic '{topic.title}' deleted successfully!", "success")
 
     return RedirectResponse(
@@ -249,7 +310,7 @@ def view_topic_file(topic_id: int, request: Request, db: Session = Depends(get_d
 
 
 # ---------------------------------
-# GET: View Uploaded Topics (Read-Only)
+# GET: View Uploaded Topics 
 # ---------------------------------
 @faculty_upload_router.get("/course/{course_id}/view-topics", response_class=HTMLResponse, name="view_uploaded_topics")
 def view_uploaded_topics(course_id: int, request: Request, db: Session = Depends(get_db)):

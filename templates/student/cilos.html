@@ -3,174 +3,201 @@
 {% block title %}CILOs{% endblock %}
 
 {% block content %}
+<!-- Include Chart.js library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+
+<style>
+    .progress {
+        height: 10px;
+        border-radius: 6px;
+    }
+
+    #chart-1 {
+        width: 100%;
+        max-height: 250px;
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4 px-3">
-  <div class="me-3">
-    Hello, <span class="fw-bold">{{ student.full_name }}</span>!
-  </div>
-
-  <form class="d-flex flex-grow-1 me-3" role="search">
-    <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
-    <button class="btn btn-outline-success" type="submit">
-      <i class="fa fa-search"></i>
-    </button>
-  </form>
-
-  <div class="d-flex align-items-center">
-    <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
-    <img src="/static/imgs/student1.jpg" alt="Profile" class="rounded-circle"
-      style="width: 40px; height: 40px; object-fit: cover;">
-  </div>
+    <div class="me-3">
+        Hello, <span class="fw-bold">{{ user_full_name }}</span>!
+    </div>
+    <form class="d-flex flex-grow-1 me-3" role="search">
+        <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
+        <button class="btn btn-outline-success" type="submit">
+            <i class="fa fa-search"></i>
+        </button>
+    </form>
+    <div class="d-flex align-items-center">
+        <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
+        <img src="/static/imgs/student1.jpg" alt="Profile" class="rounded-circle"
+            style="width: 40px; height: 40px; object-fit: cover;">
+    </div>
 </div>
 
 <div class="container">
-  <h2 class="mb-4 text-center">Course Intended Learning Outcomes (CILOs)</h2>
-
-  <div class="mb-4 text-center">
-    <label for="courseFilter" class="form-label">Select Course:</label>
-    <select class="form-select w-auto d-inline-block" id="courseFilter">
-      <option value="all">All Courses</option>
-      <option value="it101">Introduction to Programming</option>
-      <option value="it102">Computer Fundamentals</option>
-    </select>
-  </div>
-
-  <div class="row g-4">
-    <!-- 🧩 Example Course -->
-    <div class="col-md-6">
-      <div class="card shadow border-0 h-100">
-        <div class="card-body p-4">
-          <h5 class="card-title mb-4">Introduction to Programming</h5>
-
-          <div class="row">
-            <div class="col-8">
-              <div class="mb-3">
-                <div class="d-flex justify-content-between mb-1">
-                  <strong>CILO 1: Apply programming concepts</strong>
-                  <small>85%</small>
-                </div>
-                <div class="progress" style="height: 6px;">
-                  <div class="progress-bar bg-success" style="width: 85%"></div>
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <div class="d-flex justify-content-between mb-1">
-                  <strong>CILO 2: Design algorithms</strong>
-                  <small>70%</small>
-                </div>
-                <div class="progress" style="height: 6px;">
-                  <div class="progress-bar bg-info" style="width: 70%"></div>
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <div class="d-flex justify-content-between mb-1">
-                  <strong>CILO 3: Debug simple programs</strong>
-                  <small>90%</small>
-                </div>
-                <div class="progress" style="height: 6px;">
-                  <div class="progress-bar bg-warning" style="width: 90%"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-4 d-flex justify-content-center align-items-center">
-              <canvas id="chart-1"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="mb-4 text-start mt-4">
+        <h4>Course Intended Learning Outcomes (CILOs)</h4>
+        <hr>
+        <p class="text-secondary fst-italic">
+            View and track your progress toward Course Outcomes (COs) for this course.
+        </p>
     </div>
 
-    <!-- 🧩 Another Course -->
-    <div class="col-md-6">
-      <div class="card shadow border-0 h-100">
-        <div class="card-body p-4">
-          <h5 class="card-title mb-4">Computer Fundamentals</h5>
-
-          <div class="row">
-            <div class="col-8">
-              <div class="mb-3">
-                <div class="d-flex justify-content-between mb-1">
-                  <strong>CILO 1: Explain computer hardware</strong>
-                  <small>60%</small>
+    {% for course in courses_data %}
+    <div class="row mt-5">
+        <!-- CILO Progress Chart -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow border-0" style="height: 400px;">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-4">{{ course.course_title }} - Progress Overview</h5>
+                    <div class="d-flex justify-content-center align-items-center flex-column">
+                        <canvas id="chart-1"></canvas>
+                        <script id="cilo-data-1" type="application/json">
+                            [
+                                {% for c in course.cilos %}
+                                    {"code": "{{ c.cilo_code }}", "progress": {{ c.progress|default(0) }} }{% if not loop.last %},{% endif %}
+                                {% endfor %}
+                            ]
+                        </script>
+                        <small class="text-center text-muted mt-2">Course Outcome Progress</small>
+                    </div>
                 </div>
-                <div class="progress" style="height: 6px;">
-                  <div class="progress-bar bg-danger" style="width: 60%"></div>
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <div class="d-flex justify-content-between mb-1">
-                  <strong>CILO 2: Identify software types</strong>
-                  <small>75%</small>
-                </div>
-                <div class="progress" style="height: 6px;">
-                  <div class="progress-bar bg-primary" style="width: 75%"></div>
-                </div>
-              </div>
             </div>
-
-            <div class="col-4 d-flex justify-content-center align-items-center">
-              <canvas id="chart-2"></canvas>
-            </div>
-          </div>
         </div>
-      </div>
-    </div>
 
-  </div>
+        <!-- CO/CILO Description -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow border-0" style="height: 400px;">
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold">{{ course.course_title }} - Course Outcomes (COs)</h5>
+                    <p class="text-secondary fst-italic ms-1" style="font-size: 15px;">
+                        Detailed description of the Course Intended Learning Outcomes (CILOs).
+                    </p>
+                    <ul class="list-group list-group-flush">
+                        {% for c in course.cilos %}
+                        <li class="list-group-item d-flex align-items-start mt-2">
+                            <span class="badge bg-success me-3 mt-1 fs-6">{{ c.cilo_code }}</span>
+                            <div class="text-muted fst-italic"><strong>{{ c.description }}</strong></div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% if course.course_progress >= 60 and course.low_cos|length > 0 %}
+        <div class="card shadow border-danger mt-3 ms-2">
+            <div class="p-3">
+                <h5 class="mb-0 fw-bold text-danger">Low Course Outcomes (Below {{ low_co_threshold }}%)</h5>
+            </div>
+
+            <div class="card-body">
+                <!-- COURSE PROGRESS -->
+                <div class="mb-4 ms-1" style="width: 95%;">
+                    <h6 class="fw-bold text-muted">Course Progress</h6>
+                    <div class="progress" style="height: 10px; border-radius: 8px;">
+                        <div class="progress-bar bg-success" role="progressbar"
+                            style="width: {{ course.course_progress }}%;" aria-valuenow="{{ course.course_progress }}"
+                            aria-valuemin="0" aria-valuemax="100">
+                            {{ course.course_progress }}%
+                        </div>
+                    </div>
+                </div>
+
+                {% for low in course.low_cos %}
+                <div class="mb-4 p-3 border rounded">
+                    <!-- CO TITLE + SCORE -->
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="fw-bold text-danger">{{ low.cilo_code }} – {{ low.progress }}%</span>
+                        <span class="text-muted fst-italic">{{ low.description }}</span>
+                    </div>
+
+                    <!-- Recommended Topics (Top 3) -->
+                    <h6 class="fw-bold mb-2 text-primary">Top 3 Recommended Topics</h6>
+
+                    {% set recs = course.recommendations[low.cilo_code][:3] %}
+
+                    {% if recs|length == 0 %}
+                    <p class="text-muted">No recommended topics yet.</p>
+                    {% else %}
+                    <div
+                        style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; background: #fafafa;">
+                        {% for t in recs %}
+                        <div class="mb-2 p-2 bg-white rounded shadow-sm">
+                            <strong>{{ t.topic_title }}</strong>
+                            <div class="progress mt-1" style="height: 6px;">
+                                <div class="progress-bar bg-primary" style="width: {{ t.percent }}%;"></div>
+                            </div>
+                            <small class="text-muted">Relevance: {{ t.percent }}%</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</div>
+{% endfor %}
+</div>
+
 <script>
-  // Plugin to display text in center
-  const centerText = {
-    id: 'centerText',
-    beforeDraw(chart) {
-      const { width, height, ctx } = chart;
-      ctx.restore();
-      const value = chart.config.data.datasets[0].data[0];
-      ctx.font = "1.2em sans-serif";
-      ctx.textBaseline = "middle";
-      const text = value + "%";
-      const textX = (width - ctx.measureText(text).width) / 2;
-      const textY = height / 2;
-      ctx.fillStyle = "#28a745";
-      ctx.fillText(text, textX, textY);
-      ctx.save();
+    function initializeCharts() {
+        const dataScript = document.getElementById('cilo-data-1');
+        if (!dataScript) return;
+
+        const ciloData = JSON.parse(dataScript.textContent);
+        const labels = ciloData.map(c => c.code);
+        const values = ciloData.map(c => c.progress);
+
+        // CO colors: CO1 green, CO2 yellow, CO3 blue
+        const coColors = [
+            'rgba(40, 167, 69, 0.8)',
+            'rgba(255, 193, 7, 0.8)',
+            'rgba(23, 162, 184, 0.8)'
+        ];
+
+        new Chart(document.getElementById('chart-1').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Mastery',
+                    data: values,
+                    backgroundColor: coColors.slice(0, values.length),
+                    borderColor: 'transparent',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        min: 0,
+                        max: 100,
+                        title: { display: true, text: 'Progress (%)' },
+                        ticks: { callback: v => v + '%' }
+                    },
+                    y: { grid: { display: false } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.x}%` } }
+                }
+            }
+        });
     }
-  };
 
-  Chart.register(centerText);
-
-  const charts = [
-    { id: "chart-1", progress: 82 },
-    { id: "chart-2", progress: 68 }
-  ];
-
-  charts.forEach((c) => {
-    const ctx = document.getElementById(c.id);
-    if (!ctx) return;
-    new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        datasets: [{
-          data: [c.progress, 100 - c.progress],
-          backgroundColor: ['#28a745', '#e9ecef'],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        cutout: '70%',
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false }
-        }
-      }
-    });
-  });
+    window.addEventListener('load', initializeCharts);
 </script>
+
 {% endblock %}

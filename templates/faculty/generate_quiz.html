@@ -1,79 +1,341 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MCQ Generator</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
+{% extends "faculty/base.html" %}
 
-<body class="bg-light">
-  <div class="container py-5">
-    <h2 class="text-center mb-4 fw-bold text-primary">📘 MCQ Generator</h2>
+{% block title %}Generate Questions{% endblock %}
 
-    <div class="card shadow-sm p-4">
-      <form id="mcqForm" action="/generate-mcq/" method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Upload PDF File</label>
-          <input type="file" id="file" class="form-control" accept=".pdf" required />
+{% block content %}
+
+<!-- ========================= -->
+<!-- Top Bar -->
+<!-- ========================= -->
+<div class="d-flex justify-content-between align-items-center mb-4 px-3">
+    <div>Hello, <span class="fw-bold">{{ user_full_name }}</span>!</div>
+
+    <form class="d-flex flex-grow-1 mx-3" role="search">
+        <input class="form-control me-2" type="search" placeholder="Search topics..." aria-label="Search">
+        <button class="btn btn-outline-success" type="submit">
+            <i class="fa fa-search"></i>
+        </button>
+    </form>
+
+    <div class="d-flex align-items-center">
+        <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
+        <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle"
+             style="width: 40px; height: 40px; object-fit: cover;">
+    </div>
+</div>
+
+<!-- ========================= -->
+<!-- Page Description -->
+<!-- ========================= -->
+<div class="container py-4">
+    <div class="mb-4">
+        <div class="d-flex justify-content-start align-items-center">
+            <i class="fa-solid fa-wand-magic-sparkles me-2" style="font-size: 26px; color:rgb(36, 118, 25)"></i>
+            <h3>Generate Quiz</h3>
         </div>
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Topics (comma-separated)</label>
-          <input type="text" id="topics" class="form-control" placeholder="e.g. hardware components, generation of computing" required />
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Number of Questions</label>
-          <input type="number" id="num_questions" class="form-control" min="1" max="10" value="5" required />
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100">Generate MCQs</button>
-      </form>
+        <hr style="width: 450px;">
+        <p class="text-secondary fst-italic" style="font-size: 16px;">
+            Automatically generate multiple-choice questions (MCQs) from your uploaded course materials using AI.
+            Select a topic, specify CO tags, and create quiz questions in seconds.
+        </p>
     </div>
 
-    <div class="mt-5" id="resultSection" style="display:none;">
-      <h4 class="fw-bold text-success">✅ Generated MCQs</h4>
-      <pre id="mcqOutput" class="bg-white p-3 border rounded" style="white-space: pre-wrap;"></pre>
+    <!-- Flash Message -->
+    {% if flashed.message %}
+    <div class="alert alert-{{ flashed.category }} alert-dismissible fade show mt-3" role="alert">
+        <h6 class="mb-1">{{ flashed.icon | safe }} <strong>{{ flashed.title }}</strong></h6>
+        <p class="mb-0">{{ flashed.message }}</p>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-  </div>
+    {% endif %}
 
-  <script>
-    document.getElementById('mcqForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    <!-- ========================= -->
+    <!-- Form & Generated Questions Section -->
+    <!-- ========================= -->
+    <div class="row g-4">
 
-      const fileInput = document.getElementById('file');
-      const topicsInput = document.getElementById('topics').value;
-      const numQuestionsInput = document.getElementById('num_questions').value;
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0" style="height: 480px;">
+                <div class="card-body">
 
-      if (!fileInput.files.length) {
-        alert('Please upload a PDF file.');
-        return;
-      }
+                    <form id="generateFormAlt">
+                        <!-- Topic Selection -->
+                        <div class="mb-3">
+                            <label for="topic_id" class="form-label">Select Topic</label>
+                            <select id="topic_id" name="topic_id" class="form-select" required>
+                                <option value="" disabled selected>Choose topic...</option>
+                                {% for topic in topics %}
+                                    <option value="{{ topic.id }}">{{ topic.title }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Pick an uploaded topic to generate questions from.</small>
+                        </div>
 
-      const formData = new FormData();
-      formData.append('file', fileInput.files[0]);
-      formData.append('topics', topicsInput);
-      formData.append('num_questions', numQuestionsInput);
+                        <!-- Keywords -->
+                        <div class="mb-3">
+                            <label for="topics" class="form-label">Related Keywords</label>
+                            <input type="text" id="topics" name="topics" class="form-control" placeholder="e.g., Python, Loops" required>
+                            <small class="text-muted">Separate multiple keywords with commas.</small>
+                        </div>
 
-      try {
-        const response = await fetch('/generate-mcq/', {
-          method: 'POST',
-          body: formData
+                        <!-- Number of Questions & CO Tags -->
+                        <div class="mb-3 row">
+                            <div class="col-md-6">
+                                <label for="num_questions" class="form-label">Number of Questions</label>
+                                <input type="number" id="num_questions" name="num_questions" class="form-control" min="1" max="20" value="5" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="co_tags" class="form-label">CO Tags</label>
+                                <input type="text" id="co_tags" name="co_tags" class="form-control" placeholder="CO1, CO2, CO3" required>
+                                <small class="text-muted">Separate tags with commas.</small>
+                            </div>
+                        </div>
+
+                        <!-- Generate Button -->
+                        <div class="d-grid mt-4">
+                            <button id="generateBtnAlt" type="submit" class="btn btn-success fw-bold py-2 mt-4">
+                                <span id="btnTextAlt">⚡ Generate Questions</span>
+                                <div id="spinnerAlt" class="spinner-border spinner-border-sm ms-2" style="display: none;"></div>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ------------------- -->
+        <!-- Generated Questions Card -->
+        <!-- ------------------- -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm" id="generatedQuestionsCard" style="max-height: 480px; display: none; flex-direction: column;">
+                <div class="card-header bg-success text-white fw-bold sticky-top">
+                    <i class="fa-solid fa-list-check me-2"></i>Generated Questions
+                </div>
+                <ul id="generatedQuestionsList" class="list-group list-group-flush p-3 overflow-auto" style="flex-grow: 1; max-height: 420px;"></ul>
+                <div class="card-footer bg-light text-center border-top sticky-bottom">
+                    <button id="saveQuestionsBtn" class="btn btn-success fw-semibold">
+                        <i class="fa-solid fa-floppy-disk me-2"></i>Save Questions
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ========================= -->
+<!-- Scripts -->
+<!-- ========================= -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    // --- DOM Elements ---
+    const formAlt = document.getElementById('generateFormAlt');
+    const btnAlt = document.getElementById('generateBtnAlt');
+    const spinnerAlt = document.getElementById('spinnerAlt');
+    const btnTextAlt = document.getElementById('btnTextAlt');
+    const questionsList = document.getElementById('generatedQuestionsList');
+    const questionsCard = document.getElementById('generatedQuestionsCard'); 
+    const saveBtn = document.getElementById('saveQuestionsBtn');
+    
+    // --- Save Button Dynamic Elements (Setup Spinner/Text) ---
+    const saveBtnText = document.createElement('span'); 
+    saveBtnText.textContent = 'Save Questions';
+    
+    const saveSpinner = document.createElement('span');
+    saveSpinner.className = 'spinner-border spinner-border-sm me-2';
+    saveSpinner.style.display = 'none'; // Initially hidden
+
+    saveBtn.innerHTML = '';
+    saveBtn.appendChild(saveSpinner);
+    saveBtn.appendChild(saveBtnText);
+    saveBtn.disabled = true; 
+
+    // ----------------------
+    // GENERATE QUESTIONS 
+    // ----------------------
+    formAlt.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        btnAlt.disabled = true;
+        saveBtn.disabled = true; 
+        spinnerAlt.style.display = 'inline-block';
+        btnTextAlt.textContent = 'Processing...';
+        questionsCard.style.display = 'none'; 
+
+        const formData = new FormData(formAlt);
+        try {
+            const res = await fetch('/faculty/generate_quiz/', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.status === "success") {
+                questionsList.innerHTML = "";
+                data.generated_mcqs.forEach((q, idx) => {
+                    const li = document.createElement('li');
+                    li.className = "list-group-item mb-4 shadow-sm rounded-3";
+                    
+                    const optionsHtml = (q.options || []).map((opt, i) => {
+                        const isCorrect = opt.trim() === q.correct_answer.trim();
+                        return `<li class="list-group-item ${isCorrect ? 'list-group-item-success fw-semibold' : ''}">
+                                    ${String.fromCharCode(65 + i)}. ${opt} ${isCorrect ? '(Correct)' : ''}
+                                </li>`;
+                    }).join("");
+
+                    li.innerHTML = `
+                        <div class="mb-2"><strong>Q${idx+1}:</strong> ${q.question}</div>
+                        <ul class="list-group mb-3">${optionsHtml}</ul>
+                        <div class="mt-2">
+                            <label class="form-label text-secondary mb-1">CO Tag</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge ${q.co_tag === 'CO1' ? 'bg-success text-white' : 'bg-outline-secondary text-dark border'} px-3 py-2 rounded-pill co-tag" style="cursor:pointer;">CO1</span>
+                                <span class="badge ${q.co_tag === 'CO2' ? 'bg-success text-white' : 'bg-outline-secondary text-dark border'} px-3 py-2 rounded-pill co-tag" style="cursor:pointer;">CO2</span>
+                                <span class="badge ${q.co_tag === 'CO3' ? 'bg-success text-white' : 'bg-outline-secondary text-dark border'} px-3 py-2 rounded-pill co-tag" style="cursor:pointer;">CO3</span>
+                            </div>
+                            <small class="text-muted d-block mt-1">Click to select/change CO tag.</small>
+                        </div>
+                    `;
+                    questionsList.appendChild(li);
+                });
+
+                questionsCard.style.display = 'flex';
+                initCOTagToggles();
+                saveBtn.disabled = false; 
+
+            } else {
+                alert("⚠️ Failed to generate questions.");
+                saveBtn.disabled = true; 
+            }
+        } catch (err) {
+            console.error("Generate Error:", err);
+            alert("⚠️ Error generating questions. Check console.");
+            saveBtn.disabled = true;
+        } finally {
+            btnAlt.disabled = false;
+            spinnerAlt.style.display = 'none';
+            btnTextAlt.textContent = '⚡ Generate Questions';
+        }
+    });
+
+    // ----------------------
+    // CO TAG TOGGLE 
+    // ----------------------
+    function initCOTagToggles() {
+        document.querySelectorAll('.co-tag').forEach(tag => {
+            tag.addEventListener('click', () => {
+                const parent = tag.parentElement;
+                parent.querySelectorAll('.co-tag').forEach(t => {
+                    t.classList.remove('bg-success', 'text-white');
+                    t.classList.add('bg-outline-secondary', 'text-dark', 'border');
+                });
+                tag.classList.add('bg-success', 'text-white');
+                tag.classList.remove('bg-outline-secondary', 'border', 'text-dark');
+            });
+        });
+    }
+
+    // ----------------------
+    // SAVE QUESTIONS 
+    // ----------------------
+    saveBtn.addEventListener('click', async () => {
+
+        const topicSelect = document.getElementById('topic_id');
+        const topicId = topicSelect ? topicSelect.value : null;
+
+        if (!topicId || topicId === "") {
+            return alert("⚠️ Please select a Topic before saving questions.");
+        }
+        
+        const listItems = document.querySelectorAll('#generatedQuestionsList li');
+        if (listItems.length === 0) return alert("⚠️ No questions to save.");
+
+        // --- Start Loading State ---
+        saveBtn.disabled = true;
+        saveSpinner.style.display = 'inline-block';
+        saveBtnText.textContent = 'Saving...';
+        
+        // --- Robust Question Mapping ---
+        const questions = Array.from(listItems).map(li => {
+            
+            const questionDiv = li.querySelector('div.mb-2');
+            let questionText = questionDiv ? questionDiv.textContent.trim() : "";
+            questionText = questionText.replace(/^Q\d+:\s*/, '');
+
+            const optionsElements = li.querySelectorAll('.list-group > .list-group-item');
+            const options = Array.from(optionsElements)
+                                     .map(opt => opt.textContent.replace('(Correct)', '').trim());
+            
+            const correctAnswerEl = li.querySelector('.list-group-item-success');
+            const correctAnswer = correctAnswerEl 
+                ? correctAnswerEl.textContent.replace('(Correct)', '').trim() 
+                : options[0] || 'Unknown'; 
+            
+            const coTag = li.querySelector('.co-tag.bg-success')?.textContent.trim() || 'CO1';
+            
+            return { question: questionText, options: options, correct_answer: correctAnswer, co_tag: coTag };
         });
 
-        const data = await response.json();
+        let saveFailed = false;
 
-        if (response.ok) {
-          document.getElementById('resultSection').style.display = 'block';
-          document.getElementById('mcqOutput').textContent = data.generated_mcqs;
-        } else {
-          alert(data.detail || 'An error occurred.');
+        try {
+            const payload = { topic_id: topicId, questions: questions };
+
+            const res = await fetch('/faculty/save_questions/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok && data.status === 'success' && data.redirect) {
+                window.location.reload(); 
+                return; 
+            } else if (!res.ok || data.status === 'error') {
+                 console.error("Save operation failed:", data.message || data.detail);
+                 saveFailed = true;
+                 
+                 if (!data.redirect) {
+                    alert(`❌ Save Failed: ${data.message || 'Check console for details.'}`);
+                 }
+            }
+        } catch (err) {
+            console.error("Network or JSON parsing error:", err);
+            alert("❌ A severe network error occurred. Please check your connection."); 
+            saveFailed = true;
+        } finally {
+            
+            // --- End Loading State ---
+            saveSpinner.style.display = 'none';
+            saveBtnText.textContent = 'Save Questions';
+
+            if (saveFailed) {
+                saveBtn.disabled = false; // Re-enable button to allow re-try
+            }
+            
         }
-      } catch (err) {
-        alert('Server error: ' + err.message);
-      }
     });
-  </script>
-</body>
-</html>
+    // FLASH MESSAGE AUTO-DISMISS
+    const flashAlert = document.querySelector('.alert[role="alert"]');
+    
+    if (flashAlert) {
+        const delayInMilliseconds = 5000; 
+
+        setTimeout(() => {
+            if (flashAlert) {
+                const bootstrapAlert = bootstrap.Alert.getInstance(flashAlert);
+                
+                if (bootstrapAlert) {
+                    bootstrapAlert.close();
+                } else {
+                    flashAlert.style.transition = 'opacity 0.5s ease-out';
+                    flashAlert.style.opacity = '0';
+                    setTimeout(() => {
+                        flashAlert.remove();
+                    }, 500);
+                }
+            }
+        }, delayInMilliseconds);
+    }
+
+});
+</script>
+{% endblock %}

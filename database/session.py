@@ -8,8 +8,6 @@ import logging
 
 
 load_dotenv()
-
-# Configure logging to ensure visibility of DB actions
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # PostgreSQL connection details from .env
@@ -21,10 +19,8 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 
 DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# Create the engine
 engine = create_engine(DATABASE_URL)
 
-# Create a configured "Session" class
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 def initialize_database():
@@ -40,6 +36,6 @@ def initialize_database():
 def get_db():
     db = SessionLocal()  # open a new database connection
     try:
-        yield db          # let the calling code use it
+        yield db          
     finally:
         db.close()         # automatically close it when done

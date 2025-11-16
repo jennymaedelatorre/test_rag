@@ -6,10 +6,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 
 def calculate_file_hash(file_path, block_size=65536):
-    """
-    Calculates the SHA256 hash of a file's content in chunks 
-    to handle large files efficiently.
-    """
+    """Compute SHA256 hash of a file in chunks."""
     hasher = hashlib.sha256()
     try:
         with open(file_path, 'rb') as f:
@@ -19,47 +16,33 @@ def calculate_file_hash(file_path, block_size=65536):
     except FileNotFoundError:
         return None
 
-def load_and_chunk(file_path, chunk_size=500, overlap=90, document_id=None): # 👈 Accept the ID
-    """Loads a PDF and splits it into smaller documents, attaching a custom ID."""
+def load_and_chunk(file_path, chunk_size=500, overlap=90, document_id=None):
+    """Load PDF, split into chunks, attach optional document ID."""
     loader = PyPDFLoader(file_path)
     documents = loader.load()
     
-    # 🟢 Inject the unique ID into the metadata of all initial documents
     if document_id:
         for doc in documents:
-            # Set the 'document_uuid' field in the LangChain Document metadata
-            doc.metadata['document_uuid'] = str(document_id) # 👈 Inject the UUID
+            doc.metadata['document_uuid'] = str(document_id)  # Add custom ID
 
     text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
-    # The splitter will automatically carry over the custom 'document_uuid' to all final chunks
-    docs = text_splitter.split_documents(documents)
+    docs = text_splitter.split_documents(documents)  # Split text into smaller chunks
     return docs
 
 def get_or_create_vector_store(index_path, docs=None):
-    """
-    Loads an existing FAISS index from 'index_path' or creates a new one.
-    
-    index_path is now based on the file's hash, enabling content-based caching.
-    """
-    # Use the same embedding model consistently
+    """Load existing FAISS index or create a new one with embeddings."""
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
     if os.path.exists(index_path):
-        status_message = "FAISS INDEX RELOADED from cache."
-        print(f"🟢 CACHE HIT: Loading existing FAISS index from: {index_path}")
-        # The allow_dangerous_deserialization=True flag is necessary for loading FAISS indices
+        print(f"Cache hit: Loading FAISS index from {index_path}")
         db = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
-        
+        status_message = "FAISS INDEX RELOADED from cache."
     else:
         if docs is None:
-            raise ValueError("❌ No documents provided to build FAISS index!")
-        status_message = "FAISS INDEX CREATED and saved to cache."
-        print(f"🟡 CACHE MISS: Creating NEW FAISS index at: {index_path}")
-        
+            raise ValueError("No documents provided to build FAISS index!")
+        print(f"Cache miss: Creating new FAISS index at {index_path}")
         db = FAISS.from_documents(docs, embeddings)
-        
-        # Save the new index for future use
         db.save_local(index_path) 
+        status_message = "FAISS INDEX CREATED and saved to cache."
 
-    # Return a retriever object for the chain
-    return db.as_retriever(), status_message 
+    return db.as_retriever(), status_message  # Return retriever for queries
