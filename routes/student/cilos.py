@@ -88,6 +88,9 @@ def get_co_progress_single_attempt(db: Session, student_id: int, course_id: int)
 # STUDENT CILOS PAGE (WITH RECOMMENDATIONS)
 # -----------------------------------------------------------
 # display student CILO progress and topic recommendations.
+# -----------------------------------------------------------
+# STUDENT CILOS PAGE (WITH RECOMMENDATIONS)
+# -----------------------------------------------------------
 @student_cilos_router.get("/student/cilos", response_class=HTMLResponse)
 def view_cilos_student(request: Request, db: Session = Depends(get_db)):
     # Authentication check
@@ -129,20 +132,33 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db)):
                     "progress": progress
                 })
 
-                # BUILD RECOMMENDATIONS (Find relevant topics for this low CO)
-                recommended_topics = []
+                # --- BUILD RECOMMENDATIONS (Two-Tier Logic) ---
+                primary_recommended_topics = []
+                fallback_topics = []
+
                 for topic in course.topics:
                     dist = topic_distribution.get(topic.id, {})
                     co_percent = dist.get(c.cilo_code, 0)
 
-                    # Recommend topic if it contains >= 40% questions related to the low CO
-                    if co_percent >= 40:
-                        recommended_topics.append({
-                            "topic_title": topic.title,
-                            "percent": co_percent
-                        })
+                    topic_data = {
+                        "topic_title": topic.title,
+                        "percent": co_percent
+                    }
 
-                co_recommendations[c.cilo_code] = recommended_topics
+                    # Tier 1: High Relevance (40% or higher)
+                    if co_percent >= 40:
+                        primary_recommended_topics.append(topic_data)
+                    # Tier 2: Low Relevance (Between 1% and 39%) - used only if Tier 1 is empty
+                    elif co_percent > 0:
+                        fallback_topics.append(topic_data)
+
+                # Set the final list of recommendations
+                if primary_recommended_topics:
+                    # Use high relevance topics
+                    co_recommendations[c.cilo_code] = primary_recommended_topics
+                else:
+                    # If no high-relevance topics exist, use any related topics (even low relevance)
+                    co_recommendations[c.cilo_code] = fallback_topics
 
         # Calculate student's overall course completion progress
         total_topics = getattr(course, "total_topics", 10)
@@ -154,7 +170,12 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db)):
             .filter(StudentCourseProgress.completed == True)
             .count()
         )
-        course_progress = round((completed_topics / total_topics) * 100)
+        # Ensure total_topics is not zero to prevent division by zero
+        if total_topics > 0:
+             course_progress = round((completed_topics / total_topics) * 100)
+        else:
+             course_progress = 0
+
 
         # Prepare CILO list for UI
         cilo_progress_list = [

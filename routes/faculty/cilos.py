@@ -72,47 +72,51 @@ def get_course_and_student_co_progress(db: Session, course_id: int):
 
 @faculty_cilos_router.get("/cilos", response_class=HTMLResponse)
 def view_cilos_faculty(request: Request, db: Session = Depends(get_db)):
-    # LOGIN CHECK
     user_id = request.session.get("user_id")
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
     faculty = db.query(User).filter(User.id == user_id).first()
     if not faculty or faculty.role != "faculty":
+        request.session.clear()
         return RedirectResponse(url="/auth/login", status_code=303)
 
     courses = db.query(Course).filter(Course.instructor_id == faculty.id).all()
     students = db.query(User).filter(User.role == "student").all()
-    
+
     courses_data = []
 
     for course in courses:
-        per_student_co, course_co_avg = get_course_and_student_co_progress(db, course.id)
+        topics = db.query(Topic).filter(Topic.course_id == course.id).all()
+        total_topics_count = len(topics)  # total topics in this course
 
-        # Intervention logic
+        per_student_co, course_co_avg = get_course_and_student_co_progress(db, course.id)
         intervention_students = []
-        total_topics = getattr(course, "total_topics", 10)  
 
         for student in students:
+            # Count completed topics for this student in this course
             completed_topics = (
                 db.query(StudentCourseProgress)
-                .join(StudentCourseProgress.topic)
                 .filter(StudentCourseProgress.student_id == student.id)
+                .join(StudentCourseProgress.topic)
                 .filter(StudentCourseProgress.topic.has(course_id=course.id))
                 .filter(StudentCourseProgress.completed == True)
                 .count()
             )
-            course_progress = round((completed_topics / total_topics) * 100)
 
+            course_progress = round((completed_topics / course.total_topics) * 100) if course.total_topics else 0
+
+            # Calculate low COs
             student_cos = per_student_co.get(student.id, {})
             low_cos = [co for co, val in student_cos.items() if val < 60]
 
-            # Only include students with low COs
-            if low_cos:
+            # Only show students with low COs and >= 60% course completion
+            if low_cos and course_progress >= 60:
                 intervention_students.append({
                     "student": student,
                     "course_progress": course_progress,
-                    "low_cos": low_cos
+                    "low_cos": low_cos,
+                    "mastery_data": student_cos
                 })
 
         courses_data.append({
@@ -128,7 +132,7 @@ def view_cilos_faculty(request: Request, db: Session = Depends(get_db)):
         {
             "request": request,
             "faculty": faculty,
-            "courses_data": courses_data, 
+            "courses_data": courses_data,
             "students": students,
         }
     )

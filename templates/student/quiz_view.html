@@ -29,17 +29,18 @@
                     </h6>
                 </div>
                 <div class="card-body pt-2">
+                    {% set letters = ['A', 'B', 'C', 'D'] %}
+                
                     {% for option in question.options %}
                     <div class="form-check py-2 ps-4" style="border-bottom: 1px dashed #eee;">
-                        <input class="form-check-input" type="radio" 
-                               name="answer_{{ question.question_id }}" 
-                               id="option_{{ question.question_id }}_{{ loop.index }}" 
-                               value="{{ option | trim }}" required>
+                        <input class="form-check-input" type="radio" name="answer_{{ question.question_id }}"
+                            id="option_{{ question.question_id }}_{{ loop.index }}" value="{{ option | trim }}" required>
                         <label class="form-check-label w-100" for="option_{{ question.question_id }}_{{ loop.index }}">
-                            {{ option }}
+                            <span class="fw-bold text-dark me-2">{{ letters[loop.index0] }}.</span> {{ option }}
                         </label>
                     </div>
                     {% endfor %}
+                
                 </div>
             </div>
             {% endfor %}

@@ -85,22 +85,20 @@
                 </div>
             </div>
         </div>
+
         {% if course.course_progress >= 60 and course.low_cos|length > 0 %}
-        <div class="card shadow border-danger mt-3 ms-2">
+        <div class="card shadow  mt-3 ms-2">
             <div class="p-3">
                 <h5 class="mb-0 fw-bold text-danger">Low Course Outcomes (Below {{ low_co_threshold }}%)</h5>
+                <p class="text-secondary fst-italic mt-3">This card provides a diagnostic summary for a course. It highlights Course Intended Learning Outcomes (CILOs) where your mastery 
+                    score is <br>below the set threshold (60%). This summary only appears once you have completed 60% or more of the course topics
+                </p>
             </div>
 
-            <div class="card-body">
+            <div class="">
                 <!-- COURSE PROGRESS -->
-                <div class="mb-4 ms-1" style="width: 95%;">
-                    <h6 class="fw-bold text-muted">Course Progress</h6>
-                    <div class="progress" style="height: 10px; border-radius: 8px;">
-                        <div class="progress-bar bg-success" role="progressbar"
-                            style="width: {{ course.course_progress }}%;" aria-valuenow="{{ course.course_progress }}"
-                            aria-valuemin="0" aria-valuemax="100">
-                            {{ course.course_progress }}%
-                        </div>
+                <div class="mb-4 ms-3 mt-0">
+                    <h6 class="fw-bold text-muted">Course Progress: {{ course.course_progress }}%</h6>
                     </div>
                 </div>
 
@@ -113,7 +111,7 @@
                     </div>
 
                     <!-- Recommended Topics (Top 3) -->
-                    <h6 class="fw-bold mb-2 text-primary">Top 3 Recommended Topics</h6>
+                    <h6 class=" mb-2 text-secondary fst-italic">Top 3 Recommended Topics</h6>
 
                     {% set recs = course.recommendations[low.cilo_code][:3] %}
 
@@ -126,7 +124,7 @@
                         <div class="mb-2 p-2 bg-white rounded shadow-sm">
                             <strong>{{ t.topic_title }}</strong>
                             <div class="progress mt-1" style="height: 6px;">
-                                <div class="progress-bar bg-primary" style="width: {{ t.percent }}%;"></div>
+                                <div class="progress-bar bg-success" style="width: {{ t.percent }}%;"></div>
                             </div>
                             <small class="text-muted">Relevance: {{ t.percent }}%</small>
                         </div>

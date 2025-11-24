@@ -113,32 +113,31 @@ def view_course_topics_student(
 # ==============================
 # GET: View File 
 # ==============================
+from fastapi.responses import Response
+import mimetypes
 
-@student_topic_router.get("/topic/{topic_id}/view", name="topic_file_view")
-def topic_file_view(topic_id: int, request: Request, db: Session = Depends(get_db)):
-
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse("/auth/login", status_code=303)
-
+@student_topic_router.get("/topic/view/{topic_id}", name="view_topic_file")
+def view_topic_file(topic_id: int, request: Request, db: Session = Depends(get_db)):
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
-    if not topic or not topic.file_path:
-        raise HTTPException(404, "File not found")
 
-    
-    file_path = os.path.join(UPLOAD_DIR, topic.file_path)
-    
-    
-    absolute_file_path = os.path.abspath(file_path)
-    if not absolute_file_path.startswith(ABSOLUTE_UPLOAD_DIR):
-        logger.error(f"Path Traversal attempt blocked for user {user_id}: {file_path}")
-        raise HTTPException(400, "Invalid file path.")
+    if not topic or not topic.file_path or not os.path.exists(topic.file_path):
+        raise HTTPException(status_code=404, detail="File not found.")
 
-    return FileResponse(
-        path=absolute_file_path,
-        filename=os.path.basename(absolute_file_path),
-        media_type="application/pdf" 
+    mime_type, _ = mimetypes.guess_type(topic.file_path)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    with open(topic.file_path, "rb") as f:
+        content = f.read()
+
+    return Response(
+        content=content,
+        media_type=mime_type,
+        headers={
+            "Content-Disposition": f"inline; filename={os.path.basename(topic.file_path)}"
+        }
     )
+
 
 # ==============================
 # GET: Download File 
@@ -154,8 +153,8 @@ def download_topic_file(topic_id: int, request: Request, db: Session = Depends(g
         raise HTTPException(status_code=404, detail="Topic or file not found.")
 
     
-    file_path = os.path.join(UPLOAD_DIR, topic.file_path)
-    absolute_file_path = os.path.abspath(file_path)
+    
+    absolute_file_path = os.path.abspath(topic.file_path)
     if not absolute_file_path.startswith(ABSOLUTE_UPLOAD_DIR):
         raise HTTPException(400, "Invalid file path.")
     if not os.path.exists(absolute_file_path):

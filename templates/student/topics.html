@@ -6,125 +6,134 @@
 <div class="container py-4">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="mb-0">Course: {{ course.title }}</h3>
-        <a href="/student/courses" class="btn btn-sm btn-secondary">
-            <i class="bi bi-arrow-left me-1"></i> Back to Course
+        <h4 class="mb-0">📚 Course: {{ course.title }}</h4>
+        <a href="{{ url_for('student_courses') }}" class="btn btn-sm btn-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Courses
         </a>
     </div>
 
+    <hr style="width: 80%;">
+    <p class="text-secondary fst-italic ms-2 mb-4">Test your knowledge about this Course. Answer Assessments and Track your Course Outcome Instantly.</p>
+
     {% if topics %}
+        <div class="row g-4">
         {% for topic in topics %}
-        <div class="card shadow mt-3">
-            <div class="card-header bg-success text-white">
-                Topic {{ topic.topic_no }}
-            </div>
-            <div class="card-body">
-                <figure>
-                    <blockquote class="blockquote">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <p class="mb-0">{{ topic.title }}</p>
-                            <div>
-                                <div>
-                                    <a href="{{ url_for('topic_file_view', topic_id=topic.id) }}" target="_blank"
-                                        class="btn btn-info me-2 text-white">
-                                        <i class="bi bi-eye"></i> View
+            
+            {% set MAX_ATTEMPTS = 1 %}
+            {% set used_attempts = student_attempts.get(topic.id, 0) %}
+            {% set attempts_left = MAX_ATTEMPTS - used_attempts %}
+            
+            <!--  Determine if the quiz is finished (used all attempts)  -->
+            {% set quiz_finished = used_attempts >= MAX_ATTEMPTS and topic.question_count > 0 %}
+            
+            <div class="col-12">
+                <div class="card shadow-lg border-0 h-100">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            
+                            <div class="flex-grow-1 me-4">
+                                <h5 class="mb-1 text fw-bold">Topic {{ topic.topic_no }}: {{ topic.title }}</h5>
+                                <p class="text-muted fst-italic mb-3">{{ topic.subtitle }}</p>
+
+                                <div class="mb-3 d-flex gap-2">
+                                    <a href="{{ url_for('view_topic_file', topic_id=topic.id) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        <i class="bi bi-eye"></i> View Material
                                     </a>
-                                    <a href="{{ url_for('download_topic_file', topic_id=topic.id) }}" class="btn btn-secondary"
-                                        style="background-color: gray;">
-                                        <i class="bi bi-download"></i> Download
+                                    <a href="{{ url_for('download_topic_file', topic_id=topic.id) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-download"></i> Download Material
                                     </a>
                                 </div>
                             </div>
+
+                            <div class="text-end">
+                                
+                                {% if topic.question_count and topic.question_count > 0 %}
+                                    
+                                    {% if quiz_finished %}
+                                        <!--  View Results button  -->
+                                        <span class="badge bg-success-subtle text-success fs-6 py-2 px-3 mb-3">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Completed
+                                        </span>
+                                        <a href="{{ url_for('quiz_results', topic_id=topic.id) }}" class="btn btn-success">
+                                            <i class="bi bi-graph-up me-1"></i> View Result
+                                        </a>
+                                        
+                                    {% else %}
+                                        <!--  Quiz Available / Remaining Attempts  -->
+                                        <span class="badge bg-primary-subtle text-primary fs-6 py-2 px-3 mb-3">
+                                            <i class="bi bi-patch-question me-1"></i> Quiz Available
+                                        </span>
+                                        <button class="btn quiz-btn btn-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#quizStartModal{{ topic.id }}">
+                                            <i class="bi bi-box-arrow-in-right me-1"></i> Start Topic Quiz
+                                        </button>
+                                    {% endif %}
+                                    
+                                {% else %}
+                                    <!-- No Quiz Generated  -->
+                                    <span class="badge bg-warning-subtle text-warning fs-6 py-2 px-3 mb-3">
+                                        <i class="bi bi-clock-history me-1"></i> No Quiz Yet
+                                    </span>
+                                    <span class="text-warning d-block mt-1">Quiz not generated.</span>
+                                {% endif %}
+
+                            </div>
+
                         </div>
-                    </blockquote>
-                    <figcaption class="blockquote-footer">
-                        {{ topic.subtitle }}
-                    </figcaption>
-                </figure>
-            </div>
-        </div>
-
-        <div class="card shadow mt-2 mb-4">
-            <div class="card-header bg-primary text-white">
-                Assessment for Topic {{ topic.topic_no }} <i class="bi bi-patch-question float-end"></i>
-            </div>
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <p class="text-muted mb-0">Test your understanding of this topic.</p>
-
-                {% if topic.question_count and topic.question_count > 0 %}
-                <!-- Start Quiz Button triggers modal -->
-                <button class="btn quiz-btn btn-primary" 
-                        data-bs-toggle="modal" 
-                        data-bs-target="#quizStartModal{{ topic.id }}">
-                    <i class="bi bi-box-arrow-in-right me-1"></i> Start Topic Quiz
-                </button>
-                {% else %}
-                <span class="text-warning">No generated quiz available yet.</span>
-                {% endif %}
-            </div>
-        </div>
-
-        {% if topic.question_count and topic.question_count > 0 %}
-        <!-- Modal for this topic -->
-        <div class="modal fade" id="quizStartModal{{ topic.id }}" tabindex="-1" aria-labelledby="quizStartModalLabel{{ topic.id }}" aria-hidden="true">
-          <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content ps-3 pt-3">
-              <div class="modal-header">
-                <h5 class="modal-title" id="quizStartModalLabel{{ topic.id }}">Quiz Instructions: {{ topic.title }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <p>Please read the instructions carefully before starting the quiz:</p>
-                <ul>
-                  <li>- Ensure a stable internet connection.</li>
-                  <li>- Do not refresh, close, or navigate away once the quiz begins.</li>
-                  <li>- Each question is required; you must select one answer.</li>
-                  <li>- You will be given 1 attempt.</li>
-                  <li>- You have 15 minutes to finish the quiz, after 15 minutes the quiz will be submitted automatically.</li>
-                  <li>- Click <strong>Start Quiz</strong> to begin.</li>
-                </ul>
-
-                {% set MAX_ATTEMPTS = 1 %}
-                {% set used_attempts = student_attempts.get(topic.id, 0) %}
-                {% set attempts_left = MAX_ATTEMPTS - used_attempts %}
-                
-                {% if attempts_left <= 0 %} <p class="text-danger fw-semibold mt-2">
-                    You have already attempted this quiz.
-                    </p>
-                {% else %}
-                    <p class="text-success fw-semibold mt-2">
-                        You have 1 attempt available.
-                    </p>
-                {% endif %}
-
-
-                <div class="form-check mt-3">
-                  <input type="checkbox" class="form-check-input" id="confirmCheckModal{{ topic.id }}">
-                  <label class="form-check-label" for="confirmCheckModal{{ topic.id }}">
-                    I have read and understood the instructions.
-                  </label>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-arrow-left"></i> Cancel
-                </button>
-                <a href="{{ url_for('get_quiz_for_student', topic_id=topic.id) }}" class="btn btn-success disabled"
-                    id="startQuizBtnModal{{ topic.id }}">
-                    <i class="bi bi-play-fill"></i> Start Quiz
-                </a>
-
+                    </div>
                 </div>
             </div>
-          </div>
-        </div>
 
-        {% endif %}
+            {% if topic.question_count and topic.question_count > 0 and attempts_left > 0 %}
+            <!--   only appears if attempts_left > 0 -->
+            <div class="modal fade" id="quizStartModal{{ topic.id }}" tabindex="-1" aria-labelledby="quizStartModalLabel{{ topic.id }}" aria-hidden="true">
+              <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="quizStartModalLabel{{ topic.id }}">Quiz Instructions: {{ topic.title }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body ps-4">
+                    <h6 class="fw-bold text-dark">Important Information:</h6>
+                    <ul>
+                      <li>- You will be given {{ MAX_ATTEMPTS }} attempt.</li>
+                      <li>- You have 15 minutes to finish the quiz before it is submitted automatically.</li>
+                      <li>- Ensure a stable internet connection. Do not refresh or navigate away once started.</li>
+                    </ul>
+
+                    <p class="text-success fw-semibold mt-3">
+                        <i class="bi bi-check-circle-fill me-1"></i> You have {{ attempts_left }} attempt available.
+                    </p>
+
+                    <div class="form-check mt-3">
+                      <input type="checkbox" class="form-check-input border-black" id="confirmCheckModal{{ topic.id }}">
+                      <label class="form-check-label fw-bold" for="confirmCheckModal{{ topic.id }}">
+                        I have read and understood the instructions.
+                      </label>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg"></i> Cancel
+                    </button>
+                    <a href="{{ url_for('get_quiz_for_student', topic_id=topic.id) }}" class="btn btn-success disabled"
+                        id="startQuizBtnModal{{ topic.id }}">
+                        <i class="bi bi-play-fill"></i> Start Quiz
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
 
         {% endfor %}
+        </div>
+
     {% else %}
-        <div class="alert alert-info mt-3">
-            No uploaded topics for this course yet.
+        <div class="alert alert-info mt-3 text-center" role="alert">
+            <h4 class="alert-heading">No Topics Available</h4>
+            <p>The instructor has not uploaded any topics for this course yet.</p>
         </div>
     {% endif %}
 </div>
@@ -137,6 +146,9 @@ document.addEventListener("DOMContentLoaded", () => {
     checkboxes.forEach(checkbox => {
         const topicId = checkbox.id.replace("confirmCheckModal", "");
         const startBtn = document.getElementById("startQuizBtnModal" + topicId);
+        // Check if the start button exists 
+        if (!startBtn) return;
+        
         const originalText = startBtn.innerHTML; 
 
         // Enable/disable Start Quiz button
@@ -163,6 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     countdown--;
                 } else {
                     clearInterval(interval);
+                    // Redirect to the quiz start URL
                     window.location.href = startBtn.href;
                 }
             }, 1000);
@@ -170,7 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 </script>
-
 
 
 {% endblock %}

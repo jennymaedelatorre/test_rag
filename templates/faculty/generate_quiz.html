@@ -49,6 +49,9 @@
     </div>
     {% endif %}
 
+    <!-- Flash container -->
+    <div id="flashContainer"></div>
+
     <!-- ========================= -->
     <!-- Form & Generated Questions Section -->
     <!-- ========================= -->
@@ -127,8 +130,39 @@
 <!-- Scripts -->
 <!-- ========================= -->
 <script>
-document.addEventListener("DOMContentLoaded", () => {
+// Function to safely escape HTML characters
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe;
+    return unsafe.replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+}
 
+// Display Flash Message dynamically
+function displayFlashMessage(container, title, message, category = 'info', iconHtml = '<i class="fa-solid fa-triangle-exclamation"></i>') {
+    const alertHtml = `
+        <div class="alert alert-${category} alert-dismissible fade show mt-3" role="alert">
+            <h6 class="mb-1">${iconHtml} <strong>${title}</strong></h6>
+            <p class="mb-0">${message}</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    container.innerHTML = alertHtml;
+    
+    
+    const newAlert = container.querySelector('.alert');
+    if (newAlert) {
+        setTimeout(() => {
+            const bootstrapAlert = bootstrap.Alert.getInstance(newAlert) || new bootstrap.Alert(newAlert);
+            bootstrapAlert.close();
+        }, 5000); // Auto-dismiss after 5 seconds
+    }
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
     // --- DOM Elements ---
     const formAlt = document.getElementById('generateFormAlt');
     const btnAlt = document.getElementById('generateBtnAlt');
@@ -137,8 +171,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const questionsList = document.getElementById('generatedQuestionsList');
     const questionsCard = document.getElementById('generatedQuestionsCard'); 
     const saveBtn = document.getElementById('saveQuestionsBtn');
-    
-    // --- Save Button Dynamic Elements (Setup Spinner/Text) ---
+    const flashContainer = document.getElementById('flashContainer');
+
+    // ... (Save Button Dynamic Elements) ...
     const saveBtnText = document.createElement('span'); 
     saveBtnText.textContent = 'Save Questions';
     
@@ -150,7 +185,6 @@ document.addEventListener("DOMContentLoaded", () => {
     saveBtn.appendChild(saveSpinner);
     saveBtn.appendChild(saveBtnText);
     saveBtn.disabled = true; 
-
     // ----------------------
     // GENERATE QUESTIONS 
     // ----------------------
@@ -161,27 +195,51 @@ document.addEventListener("DOMContentLoaded", () => {
         spinnerAlt.style.display = 'inline-block';
         btnTextAlt.textContent = 'Processing...';
         questionsCard.style.display = 'none'; 
+        flashContainer.innerHTML = ''; // Clear flash container before new request
 
         const formData = new FormData(formAlt);
         try {
             const res = await fetch('/faculty/generate_quiz/', { method: 'POST', body: formData });
             const data = await res.json();
 
-            if (data.status === "success") {
+            //  Check for flash message in the response
+            if (data.flash) {
+                // If a flash message is returned (e.g., quiz already exists), display it
+                displayFlashMessage(
+                    flashContainer,
+                    data.flash.title || "Alert",
+                    data.flash.message || "An action requires your attention.",
+                    data.flash.category || "warning",
+                    data.flash.icon || '<i class="fa-solid fa-triangle-exclamation"></i>'
+                );
+                
+                // If a flash message is shown,  don't proceed to display questions
+                questionsList.innerHTML = "";
+                questionsCard.style.display = 'none';
+                saveBtn.disabled = true;
+
+            } else if (data.status === "success") {
+                // ... (display questions, enable save button) ...
                 questionsList.innerHTML = "";
                 data.generated_mcqs.forEach((q, idx) => {
                     const li = document.createElement('li');
                     li.className = "list-group-item mb-4 shadow-sm rounded-3";
                     
+                    // --- APPLY ESCAPING TO OPTIONS ---
                     const optionsHtml = (q.options || []).map((opt, i) => {
                         const isCorrect = opt.trim() === q.correct_answer.trim();
+                        // Escape special characters in the option text
+                        const escapedOpt = escapeHtml(opt); 
                         return `<li class="list-group-item ${isCorrect ? 'list-group-item-success fw-semibold' : ''}">
-                                    ${String.fromCharCode(65 + i)}. ${opt} ${isCorrect ? '(Correct)' : ''}
+                                    ${String.fromCharCode(65 + i)}. ${escapedOpt} ${isCorrect ? '(Correct)' : ''}
                                 </li>`;
                     }).join("");
 
+                    // --- APPLY ESCAPING TO QUESTION TEXT ---
+                    const escapedQuestion = escapeHtml(q.question);
+                    
                     li.innerHTML = `
-                        <div class="mb-2"><strong>Q${idx+1}:</strong> ${q.question}</div>
+                        <div class="mb-2"><strong>Q${idx+1}:</strong> ${escapedQuestion}</div>
                         <ul class="list-group mb-3">${optionsHtml}</ul>
                         <div class="mt-2">
                             <label class="form-label text-secondary mb-1">CO Tag</label>
@@ -214,7 +272,6 @@ document.addEventListener("DOMContentLoaded", () => {
             btnTextAlt.textContent = '⚡ Generate Questions';
         }
     });
-
     // ----------------------
     // CO TAG TOGGLE 
     // ----------------------
@@ -261,13 +318,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const optionsElements = li.querySelectorAll('.list-group > .list-group-item');
             const options = Array.from(optionsElements)
-                                     .map(opt => opt.textContent.replace('(Correct)', '').trim());
-            
+                // Decode HTML entities (e.g., &lt; to <) before cleaning up
+                .map(opt => {
+                    const temp = document.createElement('div');
+                    temp.innerHTML = opt.textContent;
+                    return temp.textContent.replace('(Correct)', '').trim().replace(/^[A-Z]\.\s*/, '');
+                });
+
+            // The correct answer text also needs to be decoded/cleaned correctly
             const correctAnswerEl = li.querySelector('.list-group-item-success');
-            const correctAnswer = correctAnswerEl 
-                ? correctAnswerEl.textContent.replace('(Correct)', '').trim() 
+            let correctAnswer = correctAnswerEl 
+                ? correctAnswerEl.textContent.trim().replace('(Correct)', '').replace(/^[A-Z]\.\s*/, '')
                 : options[0] || 'Unknown'; 
             
+            // Ensure correct answer is also decoded if it contains HTML entities
+            const tempCorrect = document.createElement('div');
+            tempCorrect.innerHTML = correctAnswer;
+            correctAnswer = tempCorrect.textContent.trim();
+
+
             const coTag = li.querySelector('.co-tag.bg-success')?.textContent.trim() || 'CO1';
             
             return { question: questionText, options: options, correct_answer: correctAnswer, co_tag: coTag };
@@ -321,11 +390,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         setTimeout(() => {
             if (flashAlert) {
+                
                 const bootstrapAlert = bootstrap.Alert.getInstance(flashAlert);
                 
                 if (bootstrapAlert) {
                     bootstrapAlert.close();
                 } else {
+                    
                     flashAlert.style.transition = 'opacity 0.5s ease-out';
                     flashAlert.style.opacity = '0';
                     setTimeout(() => {
@@ -338,4 +409,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 </script>
+
 {% endblock %}

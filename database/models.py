@@ -89,11 +89,14 @@ class Topic(Base):
 
     # Relationships
     course = relationship("Course", back_populates="topics")
+
     generated_questions = relationship(
         "GeneratedQuestion",
         back_populates="source_topic",
-        lazy="dynamic"
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
+
     downloads = relationship("DownloadHistory", back_populates="topic", cascade="all, delete")
 
     def __repr__(self):
@@ -121,15 +124,22 @@ class GeneratedQuestion(Base):
     question_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     topic_id = Column(Integer, ForeignKey("topics.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
-    question_text = Column(String, nullable=False)
-    options_json = Column(String, nullable=False)
-    correct_answer = Column(String, nullable=False)
+    question_text = Column(Text, nullable=False)
+    options_json = Column(Text, nullable=False)
+    correct_answer = Column(Text, nullable=False)
     co_tag = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     source_topic = relationship("Topic", back_populates="generated_questions")
     generator = relationship("User", back_populates="generated_questions")
+
+    topic_id = Column(
+        Integer,
+        ForeignKey("topics.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
 
 
 class StudentQuizAttempt(Base):

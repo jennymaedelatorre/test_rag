@@ -2,7 +2,10 @@
 {% block title %}Quiz Review{% endblock %}
 
 {% block content %}
-<!-- Top Bar -->
+
+{# Define letters for A, B, C, D labeling #}
+{% set letters = ['A', 'B', 'C', 'D'] %}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div class="me-3">
     Hello, <span class="fw-bold">{{ user_full_name }}</span>!
@@ -23,38 +26,61 @@
 </div>
 
 <div class="d-flex justify-content-between mt-4 ms-1">
-  <h4 class="text-success">Quiz Review</h4>
-  <a href="{{ url_for('view_course_topics_student', course_id=1) }}" class="btn btn-success text-white me-2">Back to Topic</a>
+  <h5 class="text-success">Quiz Review: {{ topic.title }}</h5>
+  <a href="{{ url_for('view_course_topics_student', course_id=topic.course_id) }}" class="btn btn-success text-white me-2">
+    <i class="bi bi-arrow-left"></i> Back to Topic
+  </a>
 </div>
 
-<p class="ms-2">Score: {{ score }} / {{ total }}</p>
+<p class="ms-2 fw-bold ">Score: <span class="text-success">{{ score }}</span> / {{ total }}</p>
 
 {% for q in review_data %}
 <div 
-  class="p-4 mb-4 rounded shadow bg-white {% if q.user_answer == q.correct_answer %}border border-1 border-success{% else %}border border-1 border-danger{% endif %}"
+  class="p-4 mb-4 rounded shadow bg-white {% if q.is_correct %}border border-1 border-success{% else %}border border-1 border-danger{% endif %}"
 >
   <div class="d-flex justify-content-between">
     <p><strong>Q{{ loop.index }}:</strong> {{ q.question_text }}</p>
     <p class="me-4 fst-italic">CO Tag: <b>{{ q.co_tag }}</b></p>
   </div>
 
-  <ul class="mb-4">
+  <ul class="mb-4 list-unstyled">
     {% for opt in q.options %}
       <li 
-        {% if opt == q.correct_answer %} class="text-success fw-bold" {% endif %}
-        {% if opt == q.user_answer and opt != q.correct_answer %} style="color: red; font-weight: bold;" {% endif %}
+        {% if opt == q.correct_answer %} class="text-success fw-bold" 
+        {% elif opt == q.user_answer and not q.is_correct %} style="color: red; font-weight: bold;" 
+        {% endif %}
       >
-        {{ opt }}
+        <span class="fw-bold text-dark me-2">{{ letters[loop.index0] }}.</span> {{ opt }}
       </li>
     {% endfor %}
   </ul>
 
   <p class="mb-0">Your Answer: 
-    <i class="{% if q.user_answer == q.correct_answer %}text-success{% else %}text-danger{% endif %}">
-      {{ q.user_answer }}
+    <i class="{% if q.is_correct %}text-success{% else %}text-danger{% endif %} fw-bold">
+      {% if q.user_answer in q.options %}
+          {% set user_letter = letters[q.options.index(q.user_answer)] %}
+          {{ user_letter }}. {{ q.user_answer }}
+      {% else %}
+          - {{ q.user_answer }}
+      {% endif %}
     </i>
+    {% if q.is_correct %}
+        <i class="bi bi-check-circle-fill text-success ms-2"></i>
+    {% else %}
+        <i class="bi bi-x-circle-fill text-danger ms-2"></i>
+    {% endif %}
   </p>
-  <p class="mt-0">Correct Answer: <b class="text-success">{{ q.correct_answer }}</b></p>
+
+  {% if not q.is_correct %}
+  <p class="mt-0">Correct Answer: 
+    {% if q.correct_answer in q.options %}
+        {% set correct_letter = letters[q.options.index(q.correct_answer)] %}
+        <b class="text-success">{{ correct_letter }}. {{ q.correct_answer }}</b>
+    {% else %}
+        <b class="text-success">{{ q.correct_answer }}</b>
+    {% endif %}
+  </p>
+  {% endif %}
 </div>
 {% endfor %}
 

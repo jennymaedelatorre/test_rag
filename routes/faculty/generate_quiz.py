@@ -4,9 +4,10 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 import logging
 from pathlib import Path
+import json
 
 from database.session import get_db
-from database.models import Topic, User
+from database.models import Topic, User, GeneratedQuestion
 from core.processing import get_or_create_vector_store
 from core.mcq_chain import build_chain 
 
@@ -87,6 +88,19 @@ async def generate_question(
     topic_record = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic_record:
         raise HTTPException(status_code=404, detail="Topic not found.")
+    
+    # Check if quiz already generated
+    existing_questions_count = db.query(GeneratedQuestion).filter(
+        GeneratedQuestion.topic_id == topic_id
+    ).count()
+
+    if existing_questions_count > 0:
+        msg = f"A quiz has already been generated for '{topic_record.title}'. Clear existing questions to re-generate."
+        return JSONResponse({
+            "status": "error",
+            "redirect": True,
+            "flash": {"message": msg, "category": "warning", "title": "Quiz Already Generated"}
+        })
 
     file_hash = topic_record.file_hash
     index_path = CACHE_DIR / file_hash
@@ -142,51 +156,93 @@ async def generate_question(
 # ---------------------------------
 # POST: Save MCQs (DB)
 # ---------------------------------
-
 @faculty_quiz_router.post("/save_questions/")
 async def save_generated_questions_route(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """
-    Saves generated questions received from the client payload and sets a flash message.
-    """
     user_id = request.session.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
 
     data = await request.json()
     topic_id = data.get("topic_id")
-    questions_list = data.get("questions", [])
 
     if not topic_id:
         flash(request, "Missing Topic ID.", category="danger", title="Input Error")
         return JSONResponse({"status": "error", "redirect": True})
     
-    if not questions_list:
-        flash(request, "No questions were found in the save request payload.", category="danger", title="Data Missing")
+    try:
+        topic_id_int = int(topic_id)
+    except ValueError:
+        flash(request, "Invalid Topic ID format.", category="danger", title="Input Error")
         return JSONResponse({"status": "error", "redirect": True})
+
+    cache_key = f"quiz_cache_{topic_id_int}"
     
-    topic_id_int = int(topic_id)
+    #  Get the secure, original question data from the cache
+    cached_questions = request.session.get(cache_key) 
+    
+    #  Get the user's final CO tag selections from the client payload
+    client_questions = data.get("questions", [])
+    
+    if not cached_questions:
+        # Fallback if cache is empty, but rely on client data only if necessary
+        if client_questions:
+            logging.warning("Cache empty. Relying solely on client data for save operation.")
+            questions_to_save = client_questions
+        else:
+            flash(request, "Quiz data not found. Please re-generate the quiz.", category="danger", title="Data Missing")
+            return JSONResponse({"status": "error", "redirect": True})
+    
+    # MERGE LOGIC: If both exist, merge the CO tag from the client into the cache data
+    else:
+        questions_to_save = []
+        # Create a map of question text -> CO tag from the client data for quick lookup
+        client_co_map = {q.get('question', '').strip(): q.get('co_tag', 'CO1') for q in client_questions}
+        
+        for q_cache in cached_questions:
+            # Match question text (using strip for safety)
+            question_text_key = q_cache.get('question', '').strip()
+            
+            # Get the user's final CO tag, or stick with the original if no match is found
+            final_co_tag = client_co_map.get(question_text_key, q_cache.get('co_tag', 'CO1'))
+            
+            # Create the final, clean structure for saving
+            questions_to_save.append({
+                "question": q_cache.get('question'),
+                "options": q_cache.get('options'),
+                "correct_answer": q_cache.get('correct_answer'),
+                # Use the user's selected CO tag
+                "co_tag": final_co_tag, 
+            })
+
+
+    if not questions_to_save:
+        flash(request, "No valid questions to save after processing.", category="danger", title="Data Error")
+        return JSONResponse({"status": "error", "redirect": True})
 
     try:
         saved_count, status = save_generated_questions(
             db=db,
-            questions_list=questions_list,
+            questions_list=questions_to_save,
             topic_id=topic_id_int,
             user_id=user_id
         )
-
+        
         if status != "success":
-            flash(
-                request, 
-                f"Could not save questions: {status}", 
-                category="danger", 
-                title="Save Failed"
-            )
-            return JSONResponse({"status": "error", "redirect": True})
+             flash(
+                 request, 
+                 f"Could not save questions: {status}", 
+                 category="danger", 
+                 title="Save Failed"
+             )
+             return JSONResponse({"status": "error", "redirect": True})
 
-        # SUCCESS
+        # SUCCESS cleanup and flash
+        if cache_key in request.session:
+             del request.session[cache_key]
+             
         flash(
             request, 
             f"{saved_count} questions generated and saved successfully.", 

@@ -186,7 +186,7 @@ async def submit_quiz(request: Request, db: Session = Depends(get_db)):
 # ==============================
 # GET: Quiz results page
 # ==============================
-@student_quiz_router.get("/quiz/results/{topic_id}", response_class=HTMLResponse)
+@student_quiz_router.get("/quiz/results/{topic_id}", response_class=HTMLResponse, name="quiz_results")
 def quiz_results(request: Request, topic_id: int, attempt_id: str = None, db: Session = Depends(get_db)):
     user_id = request.session.get("user_id")
     if not user_id:
@@ -197,19 +197,67 @@ def quiz_results(request: Request, topic_id: int, attempt_id: str = None, db: Se
         request.session.clear()
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    # Fetch the single attempt
-    attempt = None
+    # --- Fetch Topic ---
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+         raise HTTPException(status_code=404, detail="Topic not found.")
+
+    # --- Fetch Attempt ---
+    attempt_query = db.query(StudentQuizAttempt).filter_by(student_id=user_id, topic_id=topic_id)
+
     if attempt_id:
-        attempt = db.query(StudentQuizAttempt).filter_by(id=attempt_id, student_id=user_id, topic_id=topic_id).first()
-    if not attempt:
-        attempt = db.query(StudentQuizAttempt).filter_by(student_id=user_id, topic_id=topic_id).first()
+        attempt = attempt_query.filter_by(id=attempt_id).first()
+    else:
+        # Fetch the latest attempt (submitted or not)
+        attempt = attempt_query.order_by(StudentQuizAttempt.start_time.desc()).first()
+
     if not attempt:
         raise HTTPException(status_code=404, detail="No quiz attempt found.")
 
-    # CO progress
-    topic = db.query(Topic).filter(Topic.id == topic_id).first()
-    average_co = cilos.get_co_progress_single_attempt(db, user_id, topic.course_id)
+    # --- Determine score and total questions ---
+    if not attempt.submitted:
+        # User hasn't submitted → show 0/N
+        total_questions_count = db.query(GeneratedQuestion).filter(GeneratedQuestion.topic_id == topic_id).count()
+        score = 0
+    else:
+        # Submitted → use stored values
+        total_questions_count = attempt.total_questions or db.query(GeneratedQuestion).filter(GeneratedQuestion.topic_id == topic_id).count()
+        score = attempt.score or 0
 
+    # --- Fetch Detailed Answers for Review ---
+    answers_data = db.query(StudentAnswer).filter_by(attempt_id=attempt.id).all()
+    review_data = []
+
+    for answer in answers_data:
+        question = db.query(GeneratedQuestion).filter_by(question_id=answer.question_id).first()
+        if not question: 
+            continue
+
+        try:
+            options = json.loads(question.options_json)
+        except json.JSONDecodeError:
+            options = []
+
+        user_answer_text = answer.student_answer
+        if str(user_answer_text).isdigit() and options:
+            try:
+                user_index = int(user_answer_text) - 1
+                if 0 <= user_index < len(options):
+                    user_answer_text = options[user_index]
+            except ValueError:
+                pass
+
+        review_data.append({
+            "question_text": question.question_text,
+            "options": options,
+            "correct_answer": question.correct_answer,
+            "user_answer": user_answer_text,
+            "is_correct": (user_answer_text == question.correct_answer),
+            "co_tag": question.co_tag
+        })
+
+    # --- CO progress & Time ---
+    average_co = cilos.get_co_progress_single_attempt(db, user_id, topic.course_id)
     start_time_ph = get_ph_time_from_utc(attempt.start_time)
     end_time_ph = get_ph_time_from_utc(attempt.end_time)
 
@@ -218,14 +266,15 @@ def quiz_results(request: Request, topic_id: int, attempt_id: str = None, db: Se
         {
             "request": request,
             "user_full_name": user.full_name,
-            "topic_id": topic_id,
-            "score": attempt.score,
-            "total": attempt.total_questions,
+            "topic": topic,
+            "score": score,
+            "total": total_questions_count,
             "attempt_id": attempt.id,
             "attempt_number": attempt.attempt_number,
             "start_time_ph": start_time_ph,
             "end_time_ph": end_time_ph,
-            "average_co": average_co
+            "average_co": average_co,
+            "review_data": review_data
         }
     )
 
@@ -233,7 +282,7 @@ def quiz_results(request: Request, topic_id: int, attempt_id: str = None, db: Se
 # ==============================
 # GET: Review Quiz
 # ==============================
-@student_quiz_router.get("/quiz/review/{attempt_id}", response_class=HTMLResponse)
+@student_quiz_router.get("/quiz/review/{attempt_id}", response_class=HTMLResponse, name="review_quiz")
 def review_quiz(request: Request, attempt_id: str, db: Session = Depends(get_db)):
     user_id = request.session.get("user_id")
     if not user_id:
@@ -247,28 +296,68 @@ def review_quiz(request: Request, attempt_id: str, db: Session = Depends(get_db)
     attempt = db.query(StudentQuizAttempt).filter_by(id=attempt_id, student_id=user_id).first()
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
+    
+    topic = db.query(Topic).filter(Topic.id == attempt.topic_id).first()
+    if not topic:
+         raise HTTPException(status_code=404, detail="Topic not found.")
 
     questions = db.query(GeneratedQuestion).filter_by(topic_id=attempt.topic_id).all()
-    saved_answers = {str(a.question_id): a.student_answer for a in attempt.answers}
+    saved_answers = {str(a.question_id): a for a in attempt.answers}
 
     review_data = []
     for q in questions:
+        answer_record = saved_answers.get(str(q.question_id))
+        user_answer_raw = answer_record.student_answer if answer_record else None
+        
+        try:
+            options = json.loads(q.options_json)
+        except json.JSONDecodeError:
+            options = []
+
+        # Convert numeric answers to text
+        user_answer_text = None
+        if user_answer_raw:
+            if str(user_answer_raw).isdigit() and options:
+                try:
+                    user_index = int(user_answer_raw) - 1
+                    if 0 <= user_index < len(options):
+                        user_answer_text = options[user_index]
+                except ValueError:
+                    user_answer_text = str(user_answer_raw)
+            else:
+                user_answer_text = str(user_answer_raw)
+        
+        # Default to "No Answer" if user didn't answer
+        if not user_answer_text:
+            user_answer_text = "No Answer"
+
+        is_correct = (user_answer_text == q.correct_answer)
+
         review_data.append({
             "question_text": q.question_text,
-            "options": json.loads(q.options_json),
+            "options": options,
             "correct_answer": q.correct_answer,
-            "user_answer": saved_answers.get(str(q.question_id), "No Answer"),
+            "user_answer": user_answer_text,
+            "is_correct": is_correct,
             "co_tag": q.co_tag
         })
+
+    # Always calculate total questions
+    total_questions_count = len(questions)
+    score = attempt.score if attempt.submitted else 0
+
+    print(review_data)
+
 
     return templates.TemplateResponse(
         "student/quiz_review.html",
         {
             "request": request,
             "user_full_name": user.full_name,
+            "topic": topic,
             "review_data": review_data,
-            "score": attempt.score,
-            "total": attempt.total_questions,
+            "score": score,
+            "total": total_questions_count,
         }
     )
 

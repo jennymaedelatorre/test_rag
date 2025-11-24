@@ -44,29 +44,36 @@
             </div>
         </div>
 
-        <!-- Students Needing Intervention (Faculty View, Progress ≥ 60%) -->
-        {% set filtered_students = course_data.intervention_students | selectattr('course_progress', 'ge', 60) | list %}
-        {% if filtered_students %}
+
+        <!-- intervention -->
+
+        {% set intervention_list = course_data.intervention_students %}
+
+        {% if intervention_list %}
         <div class="col-4 mb-4">
             <div class="card shadow-sm" style="height: 350px;">
                 <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
                     <span>Students Needing Intervention</span>
-                    <span class="badge bg-light text-danger">{{ course_data.intervention_students|length }}</span>
+                    <span class="badge bg-light text-danger">{{ intervention_list|length }}</span>
                 </div>
                 <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                    {% for item in course_data.intervention_students %}
+
+                    {% for item in intervention_list %}
                     <div class="card border-danger shadow-sm mb-3" style="border-radius: 12px; height: 270px;">
                         <div class="card-body d-flex flex-column p-3">
-                            <!-- Student Name -->
+
                             <h6 class="fw-bold mb-2 text-center mt-2">{{ item.student.full_name }}</h6>
 
-                            <!-- Low COs / Progress -->
                             {% if item.low_cos %}
-                            <p class="mb-1 text-center"><strong>Course Progress:</strong> {{ item.course_progress }}%
+                            <p class="mb-1 text-center">
+                                <strong>Course Progress:</strong> {{ item.course_progress }}%
                             </p>
                             <p class="mb-2 text-center"><strong>Low COs:</strong></p>
+
                             {% for co in item.low_cos %}
-                            {% set progress = course_data.per_student_co[item.student.id].get(co, 0) %}
+                            {% set student_id = item.student.id %}
+                            {% set progress = course_data.per_student_co.get(student_id, {}).get(co, 0) %}
+
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
                                     <small>{{ co }}</small>
@@ -74,15 +81,16 @@
                                 </div>
                                 <div class="progress" style="height: 6px; border-radius: 3px;">
                                     <div class="progress-bar 
-                                {% if progress < 50 %}bg-danger
-                                {% elif progress < 60 %}bg-warning
-                                {% else %}bg-success
-                                {% endif %}" role="progressbar" style="width: {{ progress }}%;"
+                            {% if progress < 50 %}bg-danger
+                            {% elif progress < 60 %}bg-warning
+                            {% else %}bg-success
+                            {% endif %}" role="progressbar" style="width: {{ progress }}%;"
                                         aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100">
                                     </div>
                                 </div>
                             </div>
                             {% endfor %}
+
                             {% else %}
                             <p class="mb-0 text-success text-center">CO performance satisfactory</p>
                             {% endif %}
@@ -96,16 +104,17 @@
             </div>
         </div>
         {% else %}
-        <!-- Optionally, show a message if no students need intervention -->
         <div class="col-4 mb-4">
             <div class="card shadow-sm" style="height: 350px;">
                 <div class="card-body text-center text-success d-flex align-items-center justify-content-center">
-                    All students are performing satisfactorily. Students with low COs will be displayed here once their
-                    course progress reaches 60% or more.
+                    All students are performing satisfactorily. Intervention alerts are only shown when a student's
+                    **Course Progress is 60% or more** and their **CO Mastery is below 60%**.
                 </div>
             </div>
         </div>
         {% endif %}
+
+
 
         <!-- Individual Student Progress -->
         <div class="col-md-8">
@@ -158,19 +167,23 @@
                     <!-- Legend -->
                     <div class="mt-4 d-flex justify-content-center gap-3 flex-wrap">
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #28a745; border-radius: 50%;"></span>
+                            <span class="d-inline-block"
+                                style="width: 15px; height: 15px; background: #28a745; border-radius: 50%;"></span>
                             <small>Excellent (≥85%)</small>
                         </div>
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #17a2b8; border-radius: 50%;"></span>
+                            <span class="d-inline-block"
+                                style="width: 15px; height: 15px; background: #17a2b8; border-radius: 50%;"></span>
                             <small>Good (70–84%)</small>
                         </div>
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #ffc107; border-radius: 50%;"></span>
+                            <span class="d-inline-block"
+                                style="width: 15px; height: 15px; background: #ffc107; border-radius: 50%;"></span>
                             <small>Average (61–69%)</small>
                         </div>
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #dc3545; border-radius: 50%;"></span>
+                            <span class="d-inline-block"
+                                style="width: 15px; height: 15px; background: #dc3545; border-radius: 50%;"></span>
                             <small>Poor (<60%)</small>
                         </div>
                     </div>
