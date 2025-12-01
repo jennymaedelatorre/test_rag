@@ -122,23 +122,22 @@ class GeneratedQuestion(Base):
     __tablename__ = "generated_questions"
 
     question_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    topic_id = Column(Integer, ForeignKey("topics.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+
+    topic_id = Column(Integer, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    question_type = Column(String(20), nullable=False, default="mcq")  # mcq | true_false | identification
     question_text = Column(Text, nullable=False)
-    options_json = Column(Text, nullable=False)
+    options_json = Column(Text, nullable=True)  
     correct_answer = Column(Text, nullable=False)
-    co_tag = Column(String, nullable=False)
+    alternative_answers_json = Column(Text, nullable=True)
+    co_tag = Column(String(10), nullable=False)
+    explanation = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     source_topic = relationship("Topic", back_populates="generated_questions")
     generator = relationship("User", back_populates="generated_questions")
-
-    topic_id = Column(
-        Integer,
-        ForeignKey("topics.id", ondelete="CASCADE"),
-        nullable=False
-    )
 
 
 
@@ -161,6 +160,8 @@ class StudentQuizAttempt(Base):
             self.start_time = datetime.utcnow()
         self.end_time = self.start_time + timedelta(minutes=duration_minutes)
 
+    student = relationship("User", backref="quiz_attempts")
+
     answers = relationship("StudentAnswer", back_populates="attempt", cascade="all, delete-orphan")
 
 
@@ -170,19 +171,19 @@ class StudentAnswer(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     attempt_id = Column(UUID(as_uuid=True), ForeignKey("student_quiz_attempts.id", ondelete="CASCADE"))
     question_id = Column(UUID(as_uuid=True), ForeignKey("generated_questions.question_id", ondelete="CASCADE"))
+    
+    question_type = Column(String(20), nullable=False, default="mcq")  
+
     question_text = Column(Text, nullable=False)
     correct_answer = Column(Text, nullable=False)
     student_answer = Column(String, nullable=True)
     co_tag = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Relationships (optional)
-    attempt = relationship(
-        "StudentQuizAttempt",
-        back_populates="answers"
-    )
-    
+    # Relationships
+    attempt = relationship("StudentQuizAttempt", back_populates="answers")
     question = relationship("GeneratedQuestion")
+
 
 class StudentCOPerformance(Base):
     __tablename__ = "student_co_performance"

@@ -183,7 +183,7 @@ async def upload_topic(
 
         flash(
             request,
-            f"Topic '{title}' uploaded and indexed successfully! ({faiss_action})",
+            f"Topic '{title}' uploaded and indexed successfully!",
             category="success"
         )
 

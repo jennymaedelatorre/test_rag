@@ -2,18 +2,26 @@
 {% block title %}Quiz: {{ topic_title }}{% endblock %}
 
 {% block content %}
-<div class="container py-5">
+
+<div class="container py-3">
 
     <div class="d-flex justify-content-between align-items-center border-bottom pb-3">
         <h1 class="text-success fw-bold mb-0">{{ topic_title }} Quiz</h1>
         <p class="text-muted mb-0">Topic ID: {{ topic_id }}</p>
     </div>
-    <p class="text-secondary fst-italic mt-2 mb-5">{{ topic_subtitle }}</p>
+    <p class="text-secondary fst-italic mt-2">{{ topic_subtitle }}</p>
+
+    {% if has_identification %}
+    <h6 class="fw-bold text-dark">Important Instruction:</h6>
+    <div class="alert alert-dismissible fade show p-2 border-0  mb-4 text-dark" role="alert">
+    ⛔ <strong >Exact Match Required:</strong> Identification answers must match the exact wording in the PDF or learning material.
+    </div>
+    {% endif %}
 
     {% if questions %}
-    <div class="alert alert-warning text-center">
-        <h5>⏱️ Time Remaining: <span id="quizTimer" class="fw-bold text-danger">--:--</span></h5>
-    </div>
+        <div class="alert alert-warning text-center">
+            <h5>⏱️ Time Remaining: <span id="quizTimer" class="fw-bold text-danger">--:--</span></h5>
+        </div>
 
     <form id="studentQuizForm" method="POST">
         <input type="hidden" name="topic_id" value="{{ topic_id }}">
@@ -23,24 +31,57 @@
             {% for question in questions %}
             <div class="card shadow-sm mb-4 border-0" data-question-id="{{ question.question_id }}">
                 <div class="card-header bg-white border-bottom-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-dark">
-                        <span class="badge bg-success me-2">{{ loop.index }}</span>
+                    <h6 class="mb-0 fw-semibold text-dark" style="width: 90%;">
+                        <span class="badge bg-success me-2 ">{{ loop.index }}</span>
                         {{ question.question_text }}
                     </h6>
                 </div>
+                
                 <div class="card-body pt-2">
-                    {% set letters = ['A', 'B', 'C', 'D'] %}
-                
-                    {% for option in question.options %}
-                    <div class="form-check py-2 ps-4" style="border-bottom: 1px dashed #eee;">
-                        <input class="form-check-input" type="radio" name="answer_{{ question.question_id }}"
-                            id="option_{{ question.question_id }}_{{ loop.index }}" value="{{ option | trim }}" required>
-                        <label class="form-check-label w-100" for="option_{{ question.question_id }}_{{ loop.index }}">
-                            <span class="fw-bold text-dark me-2">{{ letters[loop.index0] }}.</span> {{ option }}
-                        </label>
-                    </div>
-                    {% endfor %}
-                
+                    
+                    {% set question_type = question.question_type | default('mcq') %} 
+                    
+                    <!-- ===================== MCQ & TRUE/FALSE =====================  -->
+                    {% if question_type == 'mcq' or question_type == 'true_false' %}
+                        
+                        
+                        {% for option in question.options %}
+                        <div class="form-check py-2 ps-4" style="border-bottom: 1px dashed #eee;">
+                            <input class="form-check-input" type="radio" 
+                                name="answer_{{ question.question_id }}"
+                                id="option_{{ question.question_id }}_{{ loop.index }}" 
+                                value="{{ option | trim }}" required>
+                            
+                            <label class="form-check-label w-100" for="option_{{ question.question_id }}_{{ loop.index }}">
+                                {{ option }}
+                            </label>
+                        </div>
+                        {% endfor %}
+
+                     <!-- ===================== IDENTIFICATION / SHORT ANSWER ===================== -->
+                    {% elif question_type == 'identification' or question_type == 'short_answer' %}
+                        
+                        <div class="form-group mb-3 px-3">
+                            
+                            <input type="text" 
+                                class="form-control form-control-lg identify-input text-secondary" 
+                                name="answer_{{ question.question_id }}" 
+                                id="answer_{{ question.question_id }}" 
+                                placeholder="Enter your answer..." 
+                                style="font-size: 15px;"
+                                required>
+
+                            <!-- <small class="text-muted fst-italic">
+                                Your answer will be automatically normalized (lowercase, trimmed) for checking.
+                            </small> -->
+                        </div>
+
+                    {% else %}
+                        <div class="alert alert-danger my-3">
+                            Error: Question type ({{ question_type }}) not supported on this client.
+                        </div>
+                    {% endif %}
+                    
                 </div>
             </div>
             {% endfor %}
@@ -68,6 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const submitBtn = document.getElementById("submitQuizBtn");
     let isFormDirty = false;
     
+    // --- Timer Logic ---
     const endTime = new Date("{{ end_time_ph }}");
     const timerDisplay = document.getElementById("quizTimer");
 
@@ -87,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const seconds = Math.floor((diff / 1000) % 60);
         timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
     }, 1000);
+    
 
     if (quizForm) {
         quizForm.addEventListener("change", () => { isFormDirty = true; });
@@ -98,17 +141,43 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
+        // ============================
+        // 1. Live Normalization for Identification/Short Answer
+        // ============================
+        document.querySelectorAll(".identify-input").forEach(input => {
+            input.addEventListener("input", () => {
+                let val = input.value;
+                val = val.toLowerCase();        // lowercase
+                val = val.replace(/\s+/g, " "); // remove extra spaces
+                val = val.trimStart();          // clean start
+                input.value = val;
+            });
+        });
+
         quizForm.addEventListener("submit", async (e) => {
             e.preventDefault();
+            
+            // ============================
+            // 2. Final Normalization before Submission
+            // ============================
+            document.querySelectorAll(".identify-input").forEach(input => {
+                let val = input.value;
+                val = val.toLowerCase();
+                val = val.replace(/\s+/g, " ").trim(); // Final cleanup (lowercase, condense spaces, trim ends)
+                input.value = val;
+            });
+            // ============================
+            
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Submitting...';
             isFormDirty = false;
 
             const formData = new FormData(quizForm);
             const topicId = formData.get('topic_id');
-            const attemptId = formData.get('attempt_id'); 
+            const attemptId = formData.get('attempt_id');
             const answers = {};
 
+            // Collect all answers
             for (const [key, value] of formData.entries()) {
                 if (key.startsWith('answer_')) {
                     const qid = key.replace('answer_', '');

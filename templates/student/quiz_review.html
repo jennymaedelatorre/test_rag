@@ -3,9 +3,6 @@
 
 {% block content %}
 
-{# Define letters for A, B, C, D labeling #}
-{% set letters = ['A', 'B', 'C', 'D'] %}
-
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div class="me-3">
     Hello, <span class="fw-bold">{{ user_full_name }}</span>!
@@ -50,7 +47,7 @@
         {% elif opt == q.user_answer and not q.is_correct %} style="color: red; font-weight: bold;" 
         {% endif %}
       >
-        <span class="fw-bold text-dark me-2">{{ letters[loop.index0] }}.</span> {{ opt }}
+       {{ opt }}
       </li>
     {% endfor %}
   </ul>
@@ -58,8 +55,7 @@
   <p class="mb-0">Your Answer: 
     <i class="{% if q.is_correct %}text-success{% else %}text-danger{% endif %} fw-bold">
       {% if q.user_answer in q.options %}
-          {% set user_letter = letters[q.options.index(q.user_answer)] %}
-          {{ user_letter }}. {{ q.user_answer }}
+            {{ q.user_answer }}
       {% else %}
           - {{ q.user_answer }}
       {% endif %}
@@ -74,8 +70,7 @@
   {% if not q.is_correct %}
   <p class="mt-0">Correct Answer: 
     {% if q.correct_answer in q.options %}
-        {% set correct_letter = letters[q.options.index(q.correct_answer)] %}
-        <b class="text-success">{{ correct_letter }}. {{ q.correct_answer }}</b>
+        <b class="text-success">{{ q.correct_answer }}</b>
     {% else %}
         <b class="text-success">{{ q.correct_answer }}</b>
     {% endif %}

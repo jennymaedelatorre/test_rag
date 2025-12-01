@@ -4,29 +4,21 @@
 
 {% block content %}
 
-<!-- ========================= -->
-<!-- Top Bar -->
-<!-- ========================= -->
 <div class="d-flex justify-content-between align-items-center mb-4 px-3">
     <div>Hello, <span class="fw-bold">{{ user_full_name }}</span>!</div>
-
     <form class="d-flex flex-grow-1 mx-3" role="search">
         <input class="form-control me-2" type="search" placeholder="Search topics..." aria-label="Search">
         <button class="btn btn-outline-success" type="submit">
             <i class="fa fa-search"></i>
         </button>
     </form>
-
     <div class="d-flex align-items-center">
         <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
         <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle"
-             style="width: 40px; height: 40px; object-fit: cover;">
+            style="width: 40px; height: 40px; object-fit: cover;">
     </div>
 </div>
 
-<!-- ========================= -->
-<!-- Page Description -->
-<!-- ========================= -->
 <div class="container py-4">
     <div class="mb-4">
         <div class="d-flex justify-content-start align-items-center">
@@ -35,12 +27,10 @@
         </div>
         <hr style="width: 450px;">
         <p class="text-secondary fst-italic" style="font-size: 16px;">
-            Automatically generate multiple-choice questions (MCQs) from your uploaded course materials using AI.
-            Select a topic, specify CO tags, and create quiz questions in seconds.
+            Automatically generate questions (MCQs, True/False, Identification) from your uploaded course materials.
         </p>
     </div>
 
-    <!-- Flash Message -->
     {% if flashed.message %}
     <div class="alert alert-{{ flashed.category }} alert-dismissible fade show mt-3" role="alert">
         <h6 class="mb-1">{{ flashed.icon | safe }} <strong>{{ flashed.title }}</strong></h6>
@@ -49,20 +39,14 @@
     </div>
     {% endif %}
 
-    <!-- Flash container -->
     <div id="flashContainer"></div>
 
-    <!-- ========================= -->
-    <!-- Form & Generated Questions Section -->
-    <!-- ========================= -->
     <div class="row g-4">
 
         <div class="col-lg-6">
             <div class="card shadow-sm border-0" style="height: 480px;">
                 <div class="card-body">
-
                     <form id="generateFormAlt">
-                        <!-- Topic Selection -->
                         <div class="mb-3">
                             <label for="topic_id" class="form-label">Select Topic</label>
                             <select id="topic_id" name="topic_id" class="form-select" required>
@@ -74,14 +58,22 @@
                             <small class="text-muted">Pick an uploaded topic to generate questions from.</small>
                         </div>
 
-                        <!-- Keywords -->
                         <div class="mb-3">
                             <label for="topics" class="form-label">Related Keywords</label>
                             <input type="text" id="topics" name="topics" class="form-control" placeholder="e.g., Python, Loops" required>
                             <small class="text-muted">Separate multiple keywords with commas.</small>
                         </div>
 
-                        <!-- Number of Questions & CO Tags -->
+                        <div class="mb-3">
+                            <label for="question_type" class="form-label">Assessment Type</label>
+                            <select id="question_type" name="question_type" class="form-select" required>
+                                <option value="mcq" selected>Multiple Choice (MCQ)</option>
+                                <option value="true_false">True / False</option>
+                                <option value="identification">Identification / Short Answer</option>
+                            </select>
+                            <small class="text-muted">Choose the type of questions to generate.</small>
+                        </div>
+
                         <div class="mb-3 row">
                             <div class="col-md-6">
                                 <label for="num_questions" class="form-label">Number of Questions</label>
@@ -94,7 +86,6 @@
                             </div>
                         </div>
 
-                        <!-- Generate Button -->
                         <div class="d-grid mt-4">
                             <button id="generateBtnAlt" type="submit" class="btn btn-success fw-bold py-2 mt-4">
                                 <span id="btnTextAlt">⚡ Generate Questions</span>
@@ -106,9 +97,6 @@
             </div>
         </div>
 
-        <!-- ------------------- -->
-        <!-- Generated Questions Card -->
-        <!-- ------------------- -->
         <div class="col-lg-6">
             <div class="card shadow-sm" id="generatedQuestionsCard" style="max-height: 480px; display: none; flex-direction: column;">
                 <div class="card-header bg-success text-white fw-bold sticky-top">
@@ -117,8 +105,7 @@
                 <ul id="generatedQuestionsList" class="list-group list-group-flush p-3 overflow-auto" style="flex-grow: 1; max-height: 420px;"></ul>
                 <div class="card-footer bg-light text-center border-top sticky-bottom">
                     <button id="saveQuestionsBtn" class="btn btn-success fw-semibold">
-                        <i class="fa-solid fa-floppy-disk me-2"></i>Save Questions
-                    </button>
+                        </button>
                 </div>
             </div>
         </div>
@@ -126,9 +113,6 @@
     </div>
 </div>
 
-<!-- ========================= -->
-<!-- Scripts -->
-<!-- ========================= -->
 <script>
 // Function to safely escape HTML characters
 function escapeHtml(unsafe) {
@@ -151,7 +135,6 @@ function displayFlashMessage(container, title, message, category = 'info', iconH
     `;
     container.innerHTML = alertHtml;
     
-    
     const newAlert = container.querySelector('.alert');
     if (newAlert) {
         setTimeout(() => {
@@ -161,9 +144,10 @@ function displayFlashMessage(container, title, message, category = 'info', iconH
     }
 }
 
-
+// ----------------------
+// MAIN LOGIC
+// ----------------------
 document.addEventListener("DOMContentLoaded", () => {
-    // --- DOM Elements ---
     const formAlt = document.getElementById('generateFormAlt');
     const btnAlt = document.getElementById('generateBtnAlt');
     const spinnerAlt = document.getElementById('spinnerAlt');
@@ -172,39 +156,65 @@ document.addEventListener("DOMContentLoaded", () => {
     const questionsCard = document.getElementById('generatedQuestionsCard'); 
     const saveBtn = document.getElementById('saveQuestionsBtn');
     const flashContainer = document.getElementById('flashContainer');
+    const questionTypeSelect = document.getElementById('question_type');
 
-    // ... (Save Button Dynamic Elements) ...
+    // Save button spinner setup
     const saveBtnText = document.createElement('span'); 
     saveBtnText.textContent = 'Save Questions';
-    
-    const saveSpinner = document.createElement('span');
-    saveSpinner.className = 'spinner-border spinner-border-sm me-2';
-    saveSpinner.style.display = 'none'; // Initially hidden
+    const saveSpinner = document.createElement('i');
+    saveSpinner.className = 'fa-solid fa-floppy-disk me-2'; // Use an icon instead of spinner on load
+    const loadingSpinner = document.createElement('div');
+    loadingSpinner.className = 'spinner-border spinner-border-sm me-2';
+    loadingSpinner.style.display = 'none';
 
     saveBtn.innerHTML = '';
-    saveBtn.appendChild(saveSpinner);
+    saveBtn.appendChild(loadingSpinner);
     saveBtn.appendChild(saveBtnText);
-    saveBtn.disabled = true; 
+    saveBtn.disabled = true;
+
     // ----------------------
-    // GENERATE QUESTIONS 
+    // CO TAG TOGGLE
+    // ----------------------
+    function initCOTagToggles() {
+        document.querySelectorAll('.co-tag').forEach(tag => {
+            tag.addEventListener('click', () => {
+                const parent = tag.parentElement;
+                // De-select all tags in this question's group
+                parent.querySelectorAll('.co-tag').forEach(t => {
+                    t.classList.remove('bg-success', 'text-white');
+                    t.classList.add('bg-outline-secondary', 'text-dark', 'border');
+                });
+                // Select the clicked tag
+                tag.classList.add('bg-success', 'text-white');
+                tag.classList.remove('bg-outline-secondary', 'border', 'text-dark');
+            });
+        });
+    }
+
+    // ----------------------
+    // GENERATE QUESTIONS
     // ----------------------
     formAlt.addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        // Show loading state
         btnAlt.disabled = true;
-        saveBtn.disabled = true; 
+        saveBtn.disabled = true;
         spinnerAlt.style.display = 'inline-block';
         btnTextAlt.textContent = 'Processing...';
         questionsCard.style.display = 'none'; 
-        flashContainer.innerHTML = ''; // Clear flash container before new request
+        flashContainer.innerHTML = '';
 
         const formData = new FormData(formAlt);
+        const selectedType = questionTypeSelect.value;
+        formData.append('question_type', selectedType);
+
         try {
             const res = await fetch('/faculty/generate_quiz/', { method: 'POST', body: formData });
             const data = await res.json();
 
-            //  Check for flash message in the response
+            // Handle flash messages
             if (data.flash) {
-                // If a flash message is returned (e.g., quiz already exists), display it
                 displayFlashMessage(
                     flashContainer,
                     data.flash.title || "Alert",
@@ -212,35 +222,48 @@ document.addEventListener("DOMContentLoaded", () => {
                     data.flash.category || "warning",
                     data.flash.icon || '<i class="fa-solid fa-triangle-exclamation"></i>'
                 );
-                
-                // If a flash message is shown,  don't proceed to display questions
                 questionsList.innerHTML = "";
                 questionsCard.style.display = 'none';
                 saveBtn.disabled = true;
+                return;
+            }
 
-            } else if (data.status === "success") {
-                // ... (display questions, enable save button) ...
+            if (data.status === "success" && Array.isArray(data.generated_questions)) {
                 questionsList.innerHTML = "";
-                data.generated_mcqs.forEach((q, idx) => {
+
+                data.generated_questions.forEach((q, idx) => {
                     const li = document.createElement('li');
                     li.className = "list-group-item mb-4 shadow-sm rounded-3";
-                    
-                    // --- APPLY ESCAPING TO OPTIONS ---
-                    const optionsHtml = (q.options || []).map((opt, i) => {
-                        const isCorrect = opt.trim() === q.correct_answer.trim();
-                        // Escape special characters in the option text
-                        const escapedOpt = escapeHtml(opt); 
-                        return `<li class="list-group-item ${isCorrect ? 'list-group-item-success fw-semibold' : ''}">
-                                    ${String.fromCharCode(65 + i)}. ${escapedOpt} ${isCorrect ? '(Correct)' : ''}
-                                </li>`;
-                    }).join("");
 
-                    // --- APPLY ESCAPING TO QUESTION TEXT ---
-                    const escapedQuestion = escapeHtml(q.question);
+                    let optionsHtml = '';
+                    let answerDisplayHtml = '';
+                    const isMcq = selectedType === 'mcq';
+
+                    // Render Options (MCQs only)
+                    if (isMcq && q.options && q.options.length > 0) {
+                        optionsHtml = q.options.map((opt, i) => {
+                            const isCorrect = opt.trim() === q.correct_answer.trim();
+                            const escapedOpt = escapeHtml(opt); 
+                            return `<li class="list-group-item ${isCorrect ? 'list-group-item-success fw-semibold' : ''}">
+                                        ${escapedOpt} ${isCorrect ? '(Correct)' : ''}
+                                    </li>`;
+                        }).join("");
+                    }
                     
+                    // 2. Render Correct Answer (Non-MCQs only)
+                    if (!isMcq) {
+                        const escapedAnswer = escapeHtml(q.correct_answer || 'N/A');
+                         answerDisplayHtml = `<div class="alert alert-info py-2 px-3 fw-semibold mt-3" style="font-size: 15px;">
+                            <i class="fa-solid fa-lightbulb me-2"></i> **Answer:** ${escapedAnswer}
+                        </div>`;
+                    }
+
+                    const escapedQuestion = escapeHtml(q.question);
+
                     li.innerHTML = `
                         <div class="mb-2"><strong>Q${idx+1}:</strong> ${escapedQuestion}</div>
-                        <ul class="list-group mb-3">${optionsHtml}</ul>
+                        ${optionsHtml ? `<ul class="list-group mb-3">${optionsHtml}</ul>` : ''}
+                        ${answerDisplayHtml}
                         <div class="mt-2">
                             <label class="form-label text-secondary mb-1">CO Tag</label>
                             <div class="d-flex flex-wrap gap-2">
@@ -256,97 +279,82 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 questionsCard.style.display = 'flex';
                 initCOTagToggles();
-                saveBtn.disabled = false; 
-
+                saveBtn.disabled = false;
             } else {
-                alert("⚠️ Failed to generate questions.");
-                saveBtn.disabled = true; 
+                displayFlashMessage(flashContainer, "Error", "Failed to generate questions. Received unexpected data.", "danger");
+                saveBtn.disabled = true;
             }
         } catch (err) {
             console.error("Generate Error:", err);
-            alert("⚠️ Error generating questions. Check console.");
+            displayFlashMessage(flashContainer, "Error", "An error occurred while generating questions. Check console.", "danger");
             saveBtn.disabled = true;
         } finally {
+            // Restore button state
             btnAlt.disabled = false;
             spinnerAlt.style.display = 'none';
             btnTextAlt.textContent = '⚡ Generate Questions';
         }
     });
-    // ----------------------
-    // CO TAG TOGGLE 
-    // ----------------------
-    function initCOTagToggles() {
-        document.querySelectorAll('.co-tag').forEach(tag => {
-            tag.addEventListener('click', () => {
-                const parent = tag.parentElement;
-                parent.querySelectorAll('.co-tag').forEach(t => {
-                    t.classList.remove('bg-success', 'text-white');
-                    t.classList.add('bg-outline-secondary', 'text-dark', 'border');
-                });
-                tag.classList.add('bg-success', 'text-white');
-                tag.classList.remove('bg-outline-secondary', 'border', 'text-dark');
-            });
-        });
-    }
 
     // ----------------------
-    // SAVE QUESTIONS 
+    // SAVE QUESTIONS
     // ----------------------
     saveBtn.addEventListener('click', async () => {
-
         const topicSelect = document.getElementById('topic_id');
         const topicId = topicSelect ? topicSelect.value : null;
 
-        if (!topicId || topicId === "") {
-            return alert("⚠️ Please select a Topic before saving questions.");
+        if (!topicId) {
+             displayFlashMessage(flashContainer, "Validation", "Please select a **Topic** before saving questions.", "warning", '<i class="fa-solid fa-triangle-exclamation"></i>');
+             return;
         }
-        
-        const listItems = document.querySelectorAll('#generatedQuestionsList li');
-        if (listItems.length === 0) return alert("⚠️ No questions to save.");
 
-        // --- Start Loading State ---
+        const listItems = document.querySelectorAll('#generatedQuestionsList li');
+        if (listItems.length === 0) {
+            displayFlashMessage(flashContainer, "Validation", "No questions to save.", "warning", '<i class="fa-solid fa-triangle-exclamation"></i>');
+            return;
+        }
+
+        // Show saving state
         saveBtn.disabled = true;
-        saveSpinner.style.display = 'inline-block';
+        loadingSpinner.style.display = 'inline-block';
         saveBtnText.textContent = 'Saving...';
         
-        // --- Robust Question Mapping ---
         const questions = Array.from(listItems).map(li => {
-            
             const questionDiv = li.querySelector('div.mb-2');
             let questionText = questionDiv ? questionDiv.textContent.trim() : "";
             questionText = questionText.replace(/^Q\d+:\s*/, '');
 
-            const optionsElements = li.querySelectorAll('.list-group > .list-group-item');
-            const options = Array.from(optionsElements)
-                // Decode HTML entities (e.g., &lt; to <) before cleaning up
-                .map(opt => {
-                    const temp = document.createElement('div');
-                    temp.innerHTML = opt.textContent;
-                    return temp.textContent.replace('(Correct)', '').trim().replace(/^[A-Z]\.\s*/, '');
-                });
-
-            // The correct answer text also needs to be decoded/cleaned correctly
-            const correctAnswerEl = li.querySelector('.list-group-item-success');
-            let correctAnswer = correctAnswerEl 
-                ? correctAnswerEl.textContent.trim().replace('(Correct)', '').replace(/^[A-Z]\.\s*/, '')
-                : options[0] || 'Unknown'; 
+            const optionsList = li.querySelector('.list-group'); // Check for MCQ options list
             
-            // Ensure correct answer is also decoded if it contains HTML entities
-            const tempCorrect = document.createElement('div');
-            tempCorrect.innerHTML = correctAnswer;
-            correctAnswer = tempCorrect.textContent.trim();
+            let options = [];
+            let correctAnswer = 'Unknown';
+            
+            if (optionsList) {
+                // --- LOGIC FOR MCQ QUESTIONS (WITH OPTIONS LIST) ---
+                const optionsElements = li.querySelectorAll('.list-group > .list-group-item');
+                options = Array.from(optionsElements)
+                    .map(opt => opt.textContent.replace('(Correct)', '').trim().replace(/^[A-Z]\.\s*/, ''));
 
+                const correctAnswerEl = li.querySelector('.list-group-item-success');
+                correctAnswer = correctAnswerEl 
+                    ? correctAnswerEl.textContent.replace('(Correct)', '').trim().replace(/^[A-Z]\.\s*/, '')
+                    : options[0] || 'Unknown';
+
+            } else {
+                // --- LOGIC FOR TRUE/FALSE OR IDENTIFICATION QUESTIONS (NO OPTIONS LIST) ---
+                const answerAlert = li.querySelector('.alert-info');
+                if (answerAlert) {
+                    correctAnswer = answerAlert.textContent.replace('Answer:', '').trim(); 
+                }
+            }
 
             const coTag = li.querySelector('.co-tag.bg-success')?.textContent.trim() || 'CO1';
-            
+
             return { question: questionText, options: options, correct_answer: correctAnswer, co_tag: coTag };
         });
 
-        let saveFailed = false;
-
         try {
             const payload = { topic_id: topicId, questions: questions };
-
             const res = await fetch('/faculty/save_questions/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -354,59 +362,35 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             
             const data = await res.json();
+            if (res.ok && data.status === 'success' && data.redirect_url) {
+                window.location.href = data.redirect_url; 
+            } 
             
-            if (res.ok && data.status === 'success' && data.redirect) {
-                window.location.reload(); 
-                return; 
-            } else if (!res.ok || data.status === 'error') {
-                 console.error("Save operation failed:", data.message || data.detail);
-                 saveFailed = true;
-                 
-                 if (!data.redirect) {
-                    alert(`❌ Save Failed: ${data.message || 'Check console for details.'}`);
-                 }
-            }
-        } catch (err) {
-            console.error("Network or JSON parsing error:", err);
-            alert("❌ A severe network error occurred. Please check your connection."); 
-            saveFailed = true;
-        } finally {
-            
-            // --- End Loading State ---
-            saveSpinner.style.display = 'none';
-            saveBtnText.textContent = 'Save Questions';
-
-            if (saveFailed) {
-                saveBtn.disabled = false; // Re-enable button to allow re-try
-            }
-            
-        }
-    });
-    // FLASH MESSAGE AUTO-DISMISS
-    const flashAlert = document.querySelector('.alert[role="alert"]');
-    
-    if (flashAlert) {
-        const delayInMilliseconds = 5000; 
-
-        setTimeout(() => {
-            if (flashAlert) {
+            else {
+                const msg = data.flash?.message || data.detail || "Failed to save questions.";
+                const title = data.flash?.title || "Error";
+                const category = data.flash?.category || "danger";
                 
-                const bootstrapAlert = bootstrap.Alert.getInstance(flashAlert);
+                console.error("Save operation failed:", data);
+                displayFlashMessage(flashContainer, title, msg, category);
+
                 
-                if (bootstrapAlert) {
-                    bootstrapAlert.close();
-                } else {
-                    
-                    flashAlert.style.transition = 'opacity 0.5s ease-out';
-                    flashAlert.style.opacity = '0';
+                if (data.redirect) {
                     setTimeout(() => {
-                        flashAlert.remove();
-                    }, 500);
+                        window.location.reload(); 
+                    }, 2000); 
                 }
             }
-        }, delayInMilliseconds);
-    }
-
+        } catch (err) {
+            console.error("Save Error:", err);
+            displayFlashMessage(flashContainer, "Error", "A network error occurred while saving questions.", "danger");
+        } finally {
+            // Restore button state
+            loadingSpinner.style.display = 'none';
+            saveBtnText.textContent = 'Save Questions';
+            saveBtn.disabled = false;
+        }
+    });
 });
 </script>
 

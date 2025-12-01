@@ -90,6 +90,19 @@ def view_course_topics_student(
     topics_with_count = []
     for topic, count in results:
         topic.question_count = count if count is not None else 0
+
+        # Fetch distinct CO tags
+        co_tags = db.query(GeneratedQuestion.co_tag).filter(
+            GeneratedQuestion.topic_id == topic.id
+        ).distinct().all()
+        topic.co_tags = [ct[0] for ct in co_tags]
+
+        # Fetch distinct question types
+        q_types = db.query(GeneratedQuestion.question_type).filter(
+            GeneratedQuestion.topic_id == topic.id
+        ).distinct().all()
+        topic.question_types = [qt[0] for qt in q_types]
+
         topics_with_count.append(topic)
 
     # Count attempts per topic for each student
