@@ -84,8 +84,16 @@
   <div class="row">
     <div class="col-md-6">
       <div class="card border-0 shadow-sm">
-        <img src="/static/imgs/c2.jpg" class="card-img-top" alt="Programming Course Image"
-          style="height: 220px; object-fit: cover;">
+        {% if course.code == 'CSC 105' %}
+        <img src="/static/imgs/course cyber.jpg" ...
+          style="height: 250px; object-fit: cover; filter:brightness(85%) border-top:10px">
+        {% elif course.code == 'ITE 10' %}
+        <img src="/static/imgs/c2.jpg" ... style="height: 250px; object-fit: cover;">
+        {% elif course.code == 'LIE' %}
+        <img src="/static/imgs/lie.jpg" ... style="height: 250px; object-fit: cover;">
+        {% else %}
+        <img src="/static/imgs/default course.jpg" ...>
+        {% endif %}
         <div class="card-body">
           <h5 class="card-title">{{ course.title }}</h5>
           <div class="d-flex justify-content-start">
@@ -153,7 +161,6 @@
   </div>
 
   <script>
-    // Automatically hide flash messages after 3 seconds (3000ms)
     window.addEventListener('DOMContentLoaded', () => {
       const alerts = document.querySelectorAll('.alert');
       alerts.forEach(alert => {

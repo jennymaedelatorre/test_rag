@@ -6,6 +6,8 @@ from starlette.templating import Jinja2Templates
 from database.session import get_db
 from database.models import User, StudentQuizAttempt, StudentAnswer, GeneratedQuestion, Topic, Course, CILO, StudentCourseProgress
 from sqlalchemy import Integer, func
+from utils.co_progress import compute_co_progress
+
 
 student_cilos_router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -13,16 +15,12 @@ templates = Jinja2Templates(directory="templates")
 low_co_threshold = 60 
 
 
-# -----------------------------------------------------------
-# TOPIC CO DISTRIBUTION BASED ON QUIZ QUESTIONS
-# -----------------------------------------------------------
-# Used for recommendations.
+# Used for recommendations
 def get_topic_co_distribution(db: Session, course_id: int):
     topics = db.query(Topic).filter(Topic.course_id == course_id).all()
     distribution = {}
 
     for topic in topics:
-        # Get all questions for the topic
         questions = db.query(GeneratedQuestion).filter(
             GeneratedQuestion.topic_id == topic.id
         ).all()
@@ -47,53 +45,10 @@ def get_topic_co_distribution(db: Session, course_id: int):
     return distribution
 
 
-# -----------------------------------------------------------
-# CO PROGRESS PER STUDENT BASED ON QUIZ ANSWERS
-# -----------------------------------------------------------
-# Calculates the student's mastery percentage for each CILO (CO)
-def get_co_progress_single_attempt(db: Session, student_id: int, course_id: int):
 
-    topics = db.query(Topic).filter(Topic.course_id == course_id).all()
-    if not topics:
-        return {}
-
-    # Query all student answers for the course
-    answers = (
-        db.query(StudentAnswer)
-        .join(StudentQuizAttempt, StudentAnswer.attempt_id == StudentQuizAttempt.id)
-        .filter(StudentQuizAttempt.student_id == student_id)
-        .filter(StudentQuizAttempt.topic_id.in_([t.id for t in topics]))
-        .all()
-    )
-
-    if not answers:
-        return {}
-
-    co_scores = {}  # Correct answers count
-    co_counts = {}  # Total attempts count
-
-    for ans in answers:
-        co = ans.co_tag
-        co_counts[co] = co_counts.get(co, 0) + 1
-
-        # Check for correctness
-        if ans.student_answer and ans.student_answer.strip().lower() == ans.correct_answer.strip().lower():
-            co_scores[co] = co_scores.get(co, 0) + 1
-
-    # Calculate percentage progress for each CO
-    return {co: round((co_scores.get(co, 0) / co_counts[co]) * 100) for co in co_counts}
-
-
-# -----------------------------------------------------------
 # STUDENT CILOS PAGE (WITH RECOMMENDATIONS)
-# -----------------------------------------------------------
-# display student CILO progress and topic recommendations.
-# -----------------------------------------------------------
-# STUDENT CILOS PAGE (WITH RECOMMENDATIONS)
-# -----------------------------------------------------------
 @student_cilos_router.get("/student/cilos", response_class=HTMLResponse)
-def view_cilos_student(request: Request, db: Session = Depends(get_db)):
-    # Authentication check
+def view_cilos_student(request: Request, db: Session = Depends(get_db), page: int = 1):
     user_id = request.session.get("user_id")
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
@@ -104,105 +59,86 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/auth/login", status_code=303)
 
     courses = db.query(Course).all()
-    courses_data = []
+    total_courses = len(courses)
 
-    for course in courses:
+    # Ensure page is within bounds
+    if page < 1:
+        page = 1
+    if page > total_courses:
+        page = total_courses
 
-        cilos = db.query(CILO).filter(CILO.course_id == course.id).all()
-        # Student CO mastery percentages
-        co_progress_dict = get_co_progress_single_attempt(
-            db, student_id=student.id, course_id=course.id
-        )
+    # Select ONLY ONE course based on page
+    course = courses[page - 1]
 
-        # CO distribution in topics for recommendation logic
-        topic_distribution = get_topic_co_distribution(db, course.id)
+    cilos = db.query(CILO).filter(CILO.course_id == course.id).order_by(CILO.cilo_code).all()
 
-        low_cos = []
-        co_recommendations = {}
+    co_progress_dict = compute_co_progress(db, student.id, course.id)
+    topic_distribution = get_topic_co_distribution(db, course.id)
 
-        for c in cilos:
-            progress = co_progress_dict.get(c.cilo_code, 0)
+    low_cos = []
+    co_recommendations = {}
 
-            if progress < low_co_threshold:
+    for c in cilos:
+        progress = co_progress_dict.get(c.cilo_code, 0)
 
-                # Identify CILOs with low progress
-                low_cos.append({
-                    "cilo_code": c.cilo_code,
-                    "description": c.description,
-                    "progress": progress
-                })
-
-                # --- BUILD RECOMMENDATIONS (Two-Tier Logic) ---
-                primary_recommended_topics = []
-                fallback_topics = []
-
-                for topic in course.topics:
-                    dist = topic_distribution.get(topic.id, {})
-                    co_percent = dist.get(c.cilo_code, 0)
-
-                    topic_data = {
-                        "topic_title": topic.title,
-                        "percent": co_percent
-                    }
-
-                    # Tier 1: High Relevance (40% or higher)
-                    if co_percent >= 40:
-                        primary_recommended_topics.append(topic_data)
-                    # Tier 2: Low Relevance (Between 1% and 39%) - used only if Tier 1 is empty
-                    elif co_percent > 0:
-                        fallback_topics.append(topic_data)
-
-                # Set the final list of recommendations
-                if primary_recommended_topics:
-                    # Use high relevance topics
-                    co_recommendations[c.cilo_code] = primary_recommended_topics
-                else:
-                    # If no high-relevance topics exist, use any related topics (even low relevance)
-                    co_recommendations[c.cilo_code] = fallback_topics
-
-        # Calculate student's overall course completion progress
-        total_topics = getattr(course, "total_topics", 10)
-        completed_topics = (
-            db.query(StudentCourseProgress)
-            .join(StudentCourseProgress.topic)
-            .filter(StudentCourseProgress.student_id == student.id)
-            .filter(StudentCourseProgress.topic.has(course_id=course.id))
-            .filter(StudentCourseProgress.completed == True)
-            .count()
-        )
-        # Ensure total_topics is not zero to prevent division by zero
-        if total_topics > 0:
-             course_progress = round((completed_topics / total_topics) * 100)
-        else:
-             course_progress = 0
-
-
-        # Prepare CILO list for UI
-        cilo_progress_list = [
-            {
+        if progress < low_co_threshold:
+            low_cos.append({
                 "cilo_code": c.cilo_code,
                 "description": c.description,
-                "progress": co_progress_dict.get(c.cilo_code, 0)
-            }
-            for c in cilos
-        ]
+                "progress": progress
+            })
 
-        # Aggregate course data
-        courses_data.append({
-            "course_title": course.title,
-            "cilos": cilo_progress_list,
-            "low_cos": low_cos,
-            "course_progress": course_progress,
-            "recommendations": co_recommendations,
-        })
+            primary = []
+            fallback = []
+            for topic in course.topics:
+                dist = topic_distribution.get(topic.id, {})
+                percent = dist.get(c.cilo_code, 0)
 
-    # Render the HTML response
+                topic_data = {"topic_title": topic.title, "percent": percent}
+
+                if percent >= 40:
+                    primary.append(topic_data)
+                elif percent > 0:
+                    fallback.append(topic_data)
+
+            co_recommendations[c.cilo_code] = primary if primary else fallback
+
+    total_topics = getattr(course, "total_topics", 10)
+    completed_topics = (
+        db.query(StudentCourseProgress)
+        .join(StudentCourseProgress.topic)
+        .filter(StudentCourseProgress.student_id == student.id)
+        .filter(StudentCourseProgress.topic.has(course_id=course.id))
+        .filter(StudentCourseProgress.completed == True)
+        .count()
+    )
+    course_progress = round((completed_topics / total_topics) * 100) if total_topics else 0
+
+    cilo_progress_list = [
+        {
+            "cilo_code": c.cilo_code,
+            "description": c.description,
+            "progress": co_progress_dict.get(c.cilo_code, 0)
+        }
+        for c in cilos
+    ]
+
     return templates.TemplateResponse(
         "student/cilos.html",
         {
             "request": request,
             "user_full_name": student.full_name,
-            "courses_data": courses_data,
+            "course": {
+                "course_title": course.title,
+                "cilos": cilo_progress_list,
+                "low_cos": low_cos,
+                "course_progress": course_progress,
+                "recommendations": co_recommendations
+            },
+            "current_page": page,
+            "total_pages": total_courses,
+            "has_prev": page > 1,
+            "has_next": page < total_courses,
             "low_co_threshold": low_co_threshold
         }
     )

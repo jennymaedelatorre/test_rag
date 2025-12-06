@@ -28,12 +28,34 @@
   <hr style="width: 450px;">
   <p class="text-secondary fst-italic" style="font-size: 16px;">Overview of all courses you’re currently handling. Select a course to manage topics, view COs, or upload a topic.</p>
 
+{% set flashed = get_flashed_messages(request) %}
+
+{% if flashed.message %}
+<div class="alert alert-{{ flashed.category }} alert-dismissible fade show mt-3" role="alert" id="flash-alert">
+  <h6 class="mb-1">
+    {{ flashed.icon | safe }} <strong>{{ flashed.title }}</strong>
+  </h6>
+  <p class="mb-0">{{ flashed.message }}</p>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+
+
 <div class="row mt-4">
   {% for course in courses %}
   <div class="col-md-6 mb-4">
     <div class="card border-0 shadow-sm course-card h-100">
-      <img src="/static/imgs/c2.jpg" class="card-img-top rounded-top"
-        alt="{{ course.title }}" style="height: 180px; object-fit: cover;">
+      {% if course.code == 'ITE 101' %}
+        <img src="/static/imgs/course net.jpg" ...
+          style="height: 250px; object-fit: cover; filter:brightness(85%) border-top:10px">
+        {% elif course.code == 'ITE 10' %}
+        <img src="/static/imgs/c2.jpg" ... style="height: 250px; object-fit: cover;">
+        {% elif course.code == 'LIE' %}
+        <img src="/static/imgs/lie.jpg" ... style="height: 250px; object-fit: cover; filter:brightness(85%)">
+        {% else %}
+        <img src="/static/imgs/default course.jpg" ...>
+        {% endif %}
 
       <div class="card-body">
         <h5 class="card-title">{{ course.title }}</h5>
@@ -55,33 +77,83 @@
   </div>
 
   <!-- CILOs Modal -->
-  <div class="modal fade" id="cilosModal{{ course.id }}" tabindex="-1"
-    aria-labelledby="cilosModalLabel{{ course.id }}" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-success">
-          <i class="fa-regular fa-lightbulb ms-2" style="font-size: 25px; color: white;"></i>
-          <h5 class="modal-title ms-3 fw-bold text-white">Course Outcome for {{ course.code }}</h5>
-          <button type="button" class="btn-close btn-close-white fw-bold" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <p class="ms-3 fst-italic">By the end of the course, students should be able to:</p>
-          <ul class="list-group">
-            {% for cilo in course.cilos %}
-            <li class="list-group-item p-2">
-              <strong>{{ cilo.cilo_code }}:</strong> {{ cilo.description }}
-            </li>
-            {% else %}
-            <p class="text-muted ms-3">No CILOs defined yet for this course.</p>
-            {% endfor %}
-          </ul>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        </div>
+<div class="modal fade" id="cilosModal{{ course.id }}" tabindex="-1"
+  aria-labelledby="cilosModalLabel{{ course.id }}" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success">
+        <i class="fa-regular fa-lightbulb ms-2" style="font-size: 25px; color: white;"></i>
+        <h5 class="modal-title ms-3 fw-bold text-white">Course Outcomes for {{ course.code }}</h5>
+        <button type="button" class="btn-close btn-close-white fw-bold" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Add New CILO -->
+        <form action="{{ url_for('add_cilo', course_id=course.id) }}" method="POST" class="mb-3">
+          <div class="row g-2 align-items-center">
+        
+            <div class="col-2">
+              <input type="text" name="cilo_code" class="form-control" placeholder="CO Code" required>
+            </div>
+        
+            <div class="col-8">
+              <input type="text" name="description" class="form-control" placeholder="Course Outcome Description" required>
+            </div>
+        
+            <div class="col-2">
+              <button type="submit" class="btn btn-primary w-100">Add</button>
+            </div>
+        
+          </div>
+        </form>
+
+        <p class="ms-3 fst-italic">By the end of the course, students should be able to:</p>
+ 
+        <!-- Existing CILOs -->
+        <ul class="list-group">
+          {% for cilo in course.cilos %}
+          <li class="list-group-item d-flex align-items-center p-2">
+
+            <!-- Edit CILO -->
+            <form action="{{ url_for('edit_cilo', cilo_id=cilo.id) }}" method="POST" class="d-flex flex-grow me-2">
+              <input type="text" name="cilo_code" value="{{ cilo.cilo_code }}" class="form-control me-2" style="width: 70px;" required>
+              <input type="text" name="description" value="{{ cilo.description }}" class="form-control me-2" style="width: 520px" required>
+              <button type="submit" class="btn btn-sm btn-success">Update</button>
+            </form>
+
+            <!-- Delete CILO -->
+            <form action="{{ url_for('delete_cilo', cilo_id=cilo.id) }}" method="POST">
+              <button type="submit" class="btn btn-sm btn-danger p-2">Delete</button>
+            </form>
+
+          </li>
+          {% else %}
+          <p class="text-muted ms-3">No CILOs defined yet for this course.</p>
+          {% endfor %}
+        </ul>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
+</div>
+
   {% endfor %}
 </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const alert = document.getElementById("flash-alert");
+    if (alert) {
+      setTimeout(() => {
+        const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+        bsAlert.close();
+      }, 5000);
+    }
+  });
+</script>
+
+
 {% endblock %}

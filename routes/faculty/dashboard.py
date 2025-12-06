@@ -46,8 +46,6 @@ def faculty_dashboard(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
-
-    # Prepare topics data for template
     topics_data = []
     for t in topics:
         topics_data.append({
@@ -68,10 +66,10 @@ def faculty_dashboard(request: Request, db: Session = Depends(get_db)):
             "co_avg": course_co_avg
         })
 
-    # Recent activity: uploaded topics + generated questions
+    # Recent activity
     recent_activities = []
 
-    #  Log Topic Uploads
+    
     for t in topics:
         recent_activities.append({
             "type": "upload_topic",
@@ -79,13 +77,13 @@ def faculty_dashboard(request: Request, db: Session = Depends(get_db)):
             "timestamp": t.created_at
         })
 
-    # Log Generated Questions 
+    
     generated_questions = db.query(GeneratedQuestion)\
                              .filter(GeneratedQuestion.user_id == user.id)\
                              .order_by(GeneratedQuestion.created_at.desc())\
                              .all()
 
-    # Group questions into batches based on timestamp (e.g., within 5 seconds)
+    # Group questions into batches based on timestamp 
     batched_questions = []
     batch_window_seconds = 5
     
@@ -97,22 +95,18 @@ def faculty_dashboard(request: Request, db: Session = Depends(get_db)):
             current_timestamp = q.created_at
 
             if current_batch:
-                # Check if the current question is within the time window of the last question in the batch
                 time_difference = (last_timestamp - current_timestamp).total_seconds()
                 
                 if time_difference <= batch_window_seconds:
                     current_batch.append(q)
                 else:
-                    # Time difference is too large, start a new batch
                     batched_questions.append(current_batch)
                     current_batch = [q]
             else:
-                # Start the very first batch
                 current_batch.append(q)
             
             last_timestamp = current_timestamp
 
-        # Add the final batch after the loop finishes
         if current_batch:
             batched_questions.append(current_batch)
 
@@ -123,7 +117,7 @@ def faculty_dashboard(request: Request, db: Session = Depends(get_db)):
         topic_title = first_question.source_topic.title
         timestamp = first_question.created_at
 
-        # Use  "Generated question" depending on count
+        
         message = (
             f"Generated {count} questions for topic '{topic_title}'"
             if count > 1

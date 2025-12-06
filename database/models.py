@@ -51,12 +51,15 @@ class Course(Base):
     code = Column(String(50), nullable=False)
     title = Column(String(255), nullable=False)
     instructor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    course_key = Column(String(50), unique=True, nullable=False) 
+    total_topics = Column(Integer, default=10)
 
     # Relationships
     instructor = relationship("User", back_populates="courses")
-    cilos = relationship("CILO", back_populates="course", cascade="all, delete-orphan")
+    cilos = relationship("CILO", back_populates="course", cascade="all, delete-orphan", order_by="CILO.cilo_code")
     topics = relationship("Topic", back_populates="course", cascade="all, delete")
-    total_topics = Column(Integer, default=10)
+
+    
 
 
 class CILO(Base):
@@ -161,7 +164,7 @@ class StudentQuizAttempt(Base):
         self.end_time = self.start_time + timedelta(minutes=duration_minutes)
 
     student = relationship("User", backref="quiz_attempts")
-
+    topic = relationship("Topic") 
     answers = relationship("StudentAnswer", back_populates="attempt", cascade="all, delete-orphan")
 
 

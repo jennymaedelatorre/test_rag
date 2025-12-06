@@ -21,7 +21,7 @@ from routes.student.courses import student_courses_router
 from routes.student.cilos import student_cilos_router
 from routes.student.topics import student_topic_router
 from routes.student.quiz import student_quiz_router
-
+from routes.faculty.topics import faculty_topics_view_router 
 # ----------------------------
 # Basic Setup & Configuration
 # ----------------------------
@@ -57,10 +57,12 @@ faculty_routers = [
     courses.faculty_course_router,
     faculty_upload_router,
     faculty_cilos.faculty_cilos_router,
-    faculty_quiz_router
+    faculty_quiz_router,
+    faculty_topics_view_router 
 ]
 for router in faculty_routers:
     app.include_router(router)
+    
 
 student_routers = [
     student_dashboard_router,

@@ -140,7 +140,7 @@ function displayFlashMessage(container, title, message, category = 'info', iconH
         setTimeout(() => {
             const bootstrapAlert = bootstrap.Alert.getInstance(newAlert) || new bootstrap.Alert(newAlert);
             bootstrapAlert.close();
-        }, 5000); // Auto-dismiss after 5 seconds
+        }, 5000); 
     }
 }
 
@@ -250,7 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         }).join("");
                     }
                     
-                    // 2. Render Correct Answer (Non-MCQs only)
+                    //  Render Correct Answer (Non-MCQs only)
                     if (!isMcq) {
                         const escapedAnswer = escapeHtml(q.correct_answer || 'N/A');
                          answerDisplayHtml = `<div class="alert alert-info py-2 px-3 fw-semibold mt-3" style="font-size: 15px;">
@@ -324,7 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let questionText = questionDiv ? questionDiv.textContent.trim() : "";
             questionText = questionText.replace(/^Q\d+:\s*/, '');
 
-            const optionsList = li.querySelector('.list-group'); // Check for MCQ options list
+            const optionsList = li.querySelector('.list-group'); 
             
             let options = [];
             let correctAnswer = 'Unknown';

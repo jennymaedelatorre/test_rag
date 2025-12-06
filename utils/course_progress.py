@@ -20,7 +20,7 @@ def get_student_course_progress(db: Session, course_id: int, student_id: int, to
 
     # If no progress record yet, viewed/completed counts are 0
     progress_percentage = ((completed + viewed) / total_topics) * 100
-    progress_percentage = min(progress_percentage, 100)  # cap at 100%
+    progress_percentage = min(progress_percentage, 100)  
 
     return {
         "progress_percentage": round(progress_percentage, 2),

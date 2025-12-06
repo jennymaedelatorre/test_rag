@@ -18,6 +18,7 @@ from utils.time import get_ph_time_from_utc
 from collections import defaultdict
 from routes.student import cilos
 import logging
+from utils.co_progress import compute_co_progress
 
 student_quiz_router = APIRouter(prefix="/student", tags=['student'])
 templates = Jinja2Templates(directory="templates")
@@ -70,7 +71,6 @@ def get_quiz_for_student(request: Request, topic_id: int, db: Session = Depends(
     OPTION_BASED_TYPES = {"mcq", "true_false"} 
 
     for q in questions:
-        # Ensure question_type is available and lowercased for consistent template logic
         q_type = q.question_type.lower() if q.question_type else 'mcq'
         
         try:
@@ -138,25 +138,19 @@ async def submit_quiz(request: Request, db: Session = Depends(get_db)):
     total = len(questions)
     score = 0
     
-    # Define types that are auto-graded by simple text comparison
+    
     AUTOGRADED_TYPES = ["mcq", "true_false", "identification"]
 
     # Save answers 
     for q in questions:
-        q_type = q.question_type.lower() if q.question_type else 'mcq'
-        
-        correct_answer_normalized = q.correct_answer.strip().lower() if q.correct_answer else ""
-        
-        user_answer = answers.get(str(q.question_id), "").strip()
-        
+        q_type = q.question_type.lower() if q.question_type else 'mcq' 
+        correct_answer_normalized = q.correct_answer.strip().lower() if q.correct_answer else ""  
+        user_answer = answers.get(str(q.question_id), "").strip() 
         user_answer_normalized = user_answer.lower()
         
         is_correct = False
 
-        # Apply scoring logic for auto-graded types
-        if q_type in AUTOGRADED_TYPES:
-            
-           
+        if q_type in AUTOGRADED_TYPES:   
             if user_answer_normalized == correct_answer_normalized:
                 is_correct = True
             
@@ -236,7 +230,7 @@ async def submit_quiz(request: Request, db: Session = Depends(get_db)):
             if user_answer_normalized == correct_answer_normalized:
                 is_correct_for_co = True
             
-            # --- Check Alternatives for Identification (for CO Stats) ---
+            # --- Check Alternatives for Identification  ---
             elif q_type == "identification" and q.alternative_answers_json:
                 try:
                     alternatives = json.loads(q.alternative_answers_json)
@@ -324,7 +318,7 @@ def quiz_results(request: Request, topic_id: int, attempt_id: str = None, db: Se
             "co_tag": question.co_tag
         })
 
-    average_co = cilos.get_co_progress_single_attempt(db, user_id, topic.course_id)
+    average_co = cilos.compute_co_progress(db, user_id, topic.course_id)
     start_time_ph = get_ph_time_from_utc(attempt.start_time)
     end_time_ph = get_ph_time_from_utc(attempt.end_time)
 
@@ -367,7 +361,7 @@ def review_quiz(request: Request, attempt_id: str, db: Session = Depends(get_db)
     questions = db.query(GeneratedQuestion).filter_by(topic_id=attempt.topic_id).all()
     saved_answers = {str(a.question_id): a for a in attempt.answers}
 
-    # Define types that require options to be displayed in the review
+    
     OPTION_BASED_TYPES = {"mcq", "true_false"}
     review_data = []
 
@@ -381,14 +375,24 @@ def review_quiz(request: Request, attempt_id: str, db: Session = Depends(get_db)
         if answer_record:
             user_answer_raw = answer_record.student_answer.strip() if answer_record.student_answer else "No Answer"
 
-            
-            if user_answer_raw != "No Answer":
-                user_normalized = user_answer_raw.lower()
-                correct_normalized = q.correct_answer.strip().lower() if q.correct_answer else ""
-                
-               
-                is_correct = (user_normalized == correct_normalized)
-            
+        if user_answer_raw != "No Answer":
+            user_normalized = user_answer_raw.lower()
+            correct_normalized = q.correct_answer.strip().lower() if q.correct_answer else ""
+
+            # Base check
+            is_correct = (user_normalized == correct_normalized)
+
+            # Alternative answers check
+            if not is_correct and q.question_type.lower() == "identification" and q.alternative_answers_json:
+                try:
+                    alternatives = json.loads(q.alternative_answers_json)
+                    alternatives_normalized = [a.strip().lower() for a in alternatives]
+
+                    if user_normalized in alternatives_normalized:
+                        is_correct = True
+
+                except json.JSONDecodeError:
+                    pass
 
         try:
             options = json.loads(q.options_json)

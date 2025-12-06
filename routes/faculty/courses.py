@@ -3,30 +3,31 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.templating import Jinja2Templates
 from database.session import get_db
-from database.models import Course, User
+from database.models import Course, User, CILO
+from fastapi import Form, Request
+from utils.flash import get_flashed_messages, flash
 
 faculty_course_router = APIRouter(prefix="/faculty", tags=["Faculty"])
 templates = Jinja2Templates(directory="templates")
 
+# =========================
+# GET: Faculty Course
+# =========================
 @faculty_course_router.get("/courses", response_class=HTMLResponse)
 def faculty_courses(request: Request, db: Session = Depends(get_db)):
-    # authentication 
     user_id = request.session.get("user_id")
-
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    # Query the User model to get the full_name
     user = db.query(User).filter(User.id == user_id).first()
-    
     if not user:
         request.session.clear()
         return RedirectResponse(url="/auth/login", status_code=303)
 
     user_full_name = user.full_name
-    
-    # Fetch all courses 
-    courses = db.query(Course).all()
+
+    # Fetch only courses that this faculty handles
+    courses = db.query(Course).filter(Course.instructor_id == user_id).all()
 
     return templates.TemplateResponse(
         "faculty/courses.html",
@@ -34,6 +35,77 @@ def faculty_courses(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "courses": courses,
             "session": request.session,
+            "get_flashed_messages": get_flashed_messages,
             "user_full_name": user_full_name,
         }
     )
+
+
+# =========================
+# CREATE CILO
+# =========================
+@faculty_course_router.post("/courses/{course_id}/cilos/add")
+def add_cilo(
+    request: Request,
+    course_id: int,
+    cilo_code: str = Form(...),
+    description: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        new_cilo = CILO(course_id=course_id, cilo_code=cilo_code, description=description)
+        db.add(new_cilo)
+        db.commit()
+        flash(request, "Course Outcome added successfully!", "success") 
+    except Exception as e:
+        db.rollback()
+        flash(request, f"Error adding Course Outcome: {str(e)}", "danger")
+    return RedirectResponse(url="/faculty/courses", status_code=303)
+
+# =========================
+# UPDATE CILO
+# =========================
+@faculty_course_router.post("/cilos/{cilo_id}/edit")
+def edit_cilo(
+    request: Request,
+    cilo_id: int,
+    cilo_code: str = Form(...),
+    description: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        cilo = db.query(CILO).filter(CILO.id == cilo_id).first()
+        if cilo:
+            cilo.cilo_code = cilo_code
+            cilo.description = description
+            db.commit()
+            flash(request, "Course Outcome updated successfully!", "success")
+        else:
+            flash(request, "Course Outcome not found.", "danger")
+    except Exception as e:
+        db.rollback()
+        flash(request, f"Error updating CO: {str(e)}", "danger")
+    return RedirectResponse(url="/faculty/courses", status_code=303)
+
+
+# =========================
+# DELETE CILO
+# =========================
+@faculty_course_router.post("/cilos/{cilo_id}/delete")
+def delete_cilo(
+    request: Request,
+    cilo_id: int,
+    db: Session = Depends(get_db)
+):
+    try:
+        cilo = db.query(CILO).filter(CILO.id == cilo_id).first()
+        if cilo:
+            db.delete(cilo)
+            db.commit()
+            flash(request, "Course Outcome deleted successfully!", "success")
+        else:
+            flash(request, "Course Outcome not found.", "danger")
+    except Exception as e:
+        db.rollback()
+        flash(request, f"Error deleting CO: {str(e)}", "danger")
+    return RedirectResponse(url="/faculty/courses", status_code=303)
