@@ -5,19 +5,19 @@ from starlette.templating import Jinja2Templates
 from database.session import get_db
 from database.models import Course, User, DownloadHistory
 
-router = APIRouter(prefix="/student", tags=["Student Courses"])
+student_courses_router = APIRouter(prefix="/student", tags=["Student Courses"])
 templates = Jinja2Templates(directory="templates")
 
-@router.get("/courses", response_class=HTMLResponse)
+@student_courses_router.get("/courses", response_class=HTMLResponse)
 def student_courses(request: Request, db: Session = Depends(get_db)):
     """Display the list of all available courses for the student."""
     user_id = request.session.get("user_id")
 
-    # Ensure user is logged in
+    
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    # Fetch logged-in student
+    
     student = db.query(User).filter(User.id == user_id).first()
     if not student:
         return RedirectResponse(url="/auth/login", status_code=303)
