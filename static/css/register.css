@@ -24,8 +24,8 @@
     border-radius: 10px;
     box-shadow: 0 0 10px rgba(0,0,0,0.2);
     width: 100%;
-    max-width: 450px;
-    height: 630px;
+    max-width: 850px;
+    height: 680px;
   }
 
   .login-form {
@@ -40,6 +40,10 @@
     display: flex; 
     justify-content: center; 
     align-items: center;
+  }
+
+  .form-select option{
+    color: black;
   }
 
   

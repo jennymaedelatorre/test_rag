@@ -67,51 +67,76 @@
   <div class="col-md-4">
     <div class="card shadow border-0 bg-warning">
       <div class="card-body d-flex align-items-center py-4">
-        <i class="fa-solid fa-chart-line fa-2x text-white me-5"></i>
-        {% for c in course_progress_data %}
+        <i class="fa-solid fa-hourglass-half fa-2x text-white me-5"></i>
         <div class="text-white">
-          <h5 class="card-title mb-1">Course Progress</h5>
-          <p class="card-text mb-0" style="font-size: 15px;">{{ c.progress }}%</p>
-        {% endfor %}
+          <h5 class="card-title mb-1">Pending Quizzes</h5>
+          <p class="card-text mb-0" style="font-size: 15px;">
+            {{ pending_quizzes_count | default(0) }} quizzes
+          </p>
         </div>
       </div>
     </div>
   </div>
+
 </div>
 
 <div class="px-3 mb-4 mt-5">
   <h4 class="mb-3" style="font-size: 20px;">Course Overview</h4>
   <div class="row g-3">
-    <div class="col-md-6">
-      <div class="card border-0 shadow" style="height: 425px;">
-        <img src="/static/imgs/c2.jpg" class="card-img-top" alt="Programming Course Image"
-          style="height: 300px; object-fit: cover;">
-        {% for course in courses %}
-        <div class="card-body">
-          <h5 class="card-title">{{ course.title }}</h5>
-          <div class="d-flex justify-content-start">
-            <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle"
-              style="width: 30px; height: 30px; object-fit: cover;">
-            <p class="card-text text-muted ms-2 mt-1">{{ course.instructor.full_name }}</p>
+    <!-- Left Column -->
+<div class="col-md-6">
+  {% if selected_course %}
+  <div class="card border-0 shadow" style="height: 457px;">
+    <img src="{{ selected_course.image_url | default('/static/imgs/c2.jpg') }}" class="card-img-top" alt="{{ selected_course.title }}" style="height: 300px; object-fit: cover;">
+    <div class="card-body">
+      <h5 class="card-title">{{ selected_course.title }}</h5>
+
+      <!-- Course Progress Line -->
+      <div class="mt-2">
+        <p class="mb-1 text-muted">Course Progress: {{ course_progress }}%</p>
+        <div class="progress" style="height: 8px;">
+          <div 
+            class="progress-bar bg-success" 
+            role="progressbar" 
+            style="width: {{ course_progress }}%;" 
+            aria-valuenow="{{ course_progress }}" 
+            aria-valuemin="0" 
+            aria-valuemax="100">
           </div>
         </div>
-        {% endfor %}
       </div>
-    </div>
-    <!-- CO PROGRESS CHART SECTION (Polar Area Chart) -->
-    <div class="col-md-6">
-      <div class="card shadow border-0">
-        <div class="card-body p-4">
-          <h5 class="card-title mb-4">Course Outcome (CO) Mastery Overview</h5>
-          <div class="d-flex justify-content-center" style="max-height: 400px;">
-            <canvas id="coProgressChart" style="max-width: 400px;"></canvas>
-          </div>
-          <small class="text-muted fst-italic mt-2 d-block text-center">
-            Visual representation of your mastery across all Course Outcomes.
-          </small>
-        </div>
+
+      <div class="d-flex justify-content-start mt-3">
+        <img src="{{ selected_course.instructor.image_url | default('/static/imgs/faculty1.jpg') }}" alt="Instructor" class="rounded-circle" style="width: 30px; height: 30px; object-fit: cover;">
+        <p class="card-text text-muted ms-2 mt-1">{{ selected_course.instructor.full_name }}</p>
       </div>
+
     </div>
+  </div>
+  {% else %}
+  <p>No courses available.</p>
+  {% endif %}
+</div>
+
+<!-- Right Column (CO Chart) -->
+<div class="col-md-6">
+  <div class="card shadow border-0">
+    <div class="card-body p-4">
+      <h5 class="card-title">Course Outcome (CO) Mastery Overview</h5>
+      <!-- Display course name -->
+      {% if selected_course %}
+      <p class="card-title mb-4 ms-1 fst-italic text-secondary">{{ selected_course.title }}</p>
+      {% endif %}
+      <div class="d-flex justify-content-center" style="max-height: 400px;">
+        <canvas id="coProgressChart" style="max-width: 400px;"></canvas>
+      </div>
+      <small class="text-muted fst-italic mt-2 d-block text-center">
+        Visual representation of your mastery for this course.
+      </small>
+    </div>
+  </div>
+</div>
+
 
   </div>
 </div>

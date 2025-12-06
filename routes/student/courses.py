@@ -22,8 +22,9 @@ def student_courses(request: Request, db: Session = Depends(get_db)):
     if not student:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    # show all courses
-    courses = db.query(Course).all()
+    # Show only courses with assigned instructor
+    courses = db.query(Course).filter(Course.instructor_id.isnot(None)).order_by(Course.code.asc()).all()
+
 
      # Get recent downloads
     downloads = (

@@ -3,7 +3,6 @@
 {% block title %}CILOs{% endblock %}
 
 {% block content %}
-<!-- Include Chart.js library -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
 
 <style>
@@ -11,167 +10,210 @@
         height: 10px;
         border-radius: 6px;
     }
-
-    #chart-1 {
+    .chart-container {
         width: 100%;
-        max-height: 250px;
+        height: 260px;
     }
 </style>
 
+<!-- TOP HEADER -->
 <div class="d-flex justify-content-between align-items-center mb-4 px-3">
-    <div class="me-3">
-        Hello, <span class="fw-bold">{{ user_full_name }}</span>!
-    </div>
-    <form class="d-flex flex-grow-1 me-3" role="search">
-        <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search">
+    <div>Hello, <span class="fw-bold">{{ user_full_name }}</span>!</div>
+
+    <form class="d-flex flex-grow-1 mx-3" role="search">
+        <input class="form-control me-2" type="search" placeholder="Search...">
         <button class="btn btn-outline-success" type="submit">
             <i class="fa fa-search"></i>
         </button>
     </form>
+
     <div class="d-flex align-items-center">
         <i class="fa-solid fa-bell me-3 fs-5 text-primary"></i>
-        <img src="/static/imgs/student1.jpg" alt="Profile" class="rounded-circle"
-            style="width: 40px; height: 40px; object-fit: cover;">
+        <img src="/static/imgs/student1.jpg" class="rounded-circle"
+             style="width: 40px; height: 40px; object-fit: cover;">
     </div>
 </div>
 
 <div class="container">
     <div class="mb-4 text-start mt-4">
-        <h4>Course Intended Learning Outcomes (CILOs)</h4>
+        <h4>{{ course.course_title }} – COs</h4>
         <hr>
         <p class="text-secondary fst-italic">
-            View and track your progress toward Course Outcomes (COs) for this course.
+            View and track your learning outcome mastery for this course.
         </p>
     </div>
 
-    {% for course in courses_data %}
-    <div class="row mt-5">
-        <!-- CILO Progress Chart -->
+    <div class="row mt-4">
+
+        <!-- =====================
+           Progress Chart
+        ====================== -->
         <div class="col-md-6 mb-4">
-            <div class="card shadow border-0" style="height: 400px;">
+            <div class="card shadow border-0" style="height: 420px;">
                 <div class="card-body p-4">
-                    <h5 class="card-title mb-4">{{ course.course_title }} - Progress Overview</h5>
-                    <div class="d-flex justify-content-center align-items-center flex-column">
-                        <canvas id="chart-1"></canvas>
-                        <script id="cilo-data-1" type="application/json">
-                            [
-                                {% for c in course.cilos %}
-                                    {"code": "{{ c.cilo_code }}", "progress": {{ c.progress|default(0) }} }{% if not loop.last %},{% endif %}
-                                {% endfor %}
-                            ]
+                    <h5 class="card-title mb-4">{{ course.course_title }} – Progress Overview</h5>
+
+                    <div class="chart-container">
+                        <canvas id="cilos-chart"></canvas>
+
+                        <!-- Data payload for JS -->
+                        <script id="cilo-data" type="application/json">
+                            {{ course.cilos | tojson }}
                         </script>
-                        <small class="text-center text-muted mt-2">Course Outcome Progress</small>
                     </div>
+
+                    <small class="text-center text-muted d-block mt-3">
+                        Course Outcome Mastery Levels
+                    </small>
                 </div>
             </div>
         </div>
 
-        <!-- CO/CILO Description -->
+        <!-- =====================
+           CILO Descriptions
+        ====================== -->
         <div class="col-md-6 mb-4">
-            <div class="card shadow border-0" style="height: 400px;">
+            <div class="card shadow border-0" style="height: 420px;">
                 <div class="card-body p-4">
-                    <h5 class="card-title fw-bold">{{ course.course_title }} - Course Outcomes (COs)</h5>
-                    <p class="text-secondary fst-italic ms-1" style="font-size: 15px;">
-                        Detailed description of the Course Intended Learning Outcomes (CILOs).
+                    <h5 class="fw-bold">{{ course.course_title }} – Course Outcomes (COs)</h5>
+
+                    <p class="text-secondary fst-italic" style="font-size: 14px;">
+                        These represent the Course Outcomes (COs).
                     </p>
-                    <ul class="list-group list-group-flush">
+
+                    <ul class="list-group list-group-flush mt-3" style="max-height: 280px; overflow-y: auto;">
                         {% for c in course.cilos %}
-                        <li class="list-group-item d-flex align-items-start mt-2">
+                        <li class="list-group-item d-flex align-items-start">
                             <span class="badge bg-success me-3 mt-1 fs-6">{{ c.cilo_code }}</span>
-                            <div class="text-muted fst-italic"><strong>{{ c.description }}</strong></div>
+                            <div class="text-muted"><strong>{{ c.description }}</strong></div>
                         </li>
                         {% endfor %}
                     </ul>
+
                 </div>
             </div>
         </div>
 
+        <!-- =====================
+            LOW CO SECTION
+        ====================== -->
         {% if course.course_progress >= 60 and course.low_cos|length > 0 %}
-        <div class="card shadow  mt-3 ms-2">
+        <div class="card shadow mb-5">
             <div class="p-3">
-                <h5 class="mb-0 fw-bold text-danger">Low Course Outcomes (Below {{ low_co_threshold }}%)</h5>
-                <p class="text-secondary fst-italic mt-3">This card provides a diagnostic summary for a course. It highlights Course Intended Learning Outcomes (CILOs) where your mastery 
-                    score is <br>below the set threshold (60%). This summary only appears once you have completed 60% or more of the course topics
+                <h5 class="fw-bold text-danger">Low Course Outcomes (Below {{ low_co_threshold }}%)</h5>
+
+                <p class="text-secondary fst-italic mt-2">
+                    These outcomes show areas where you need improvement.
                 </p>
+
+                <h6 class="fw-bold text-muted">Course Progress: {{ course.course_progress }}%</h6>
             </div>
 
-            <div class="">
-                <!-- COURSE PROGRESS -->
-                <div class="mb-4 ms-3 mt-0">
-                    <h6 class="fw-bold text-muted">Course Progress: {{ course.course_progress }}%</h6>
-                    </div>
+            {% for low in course.low_cos %}
+            <div class="mb-3 p-3 border rounded">
+
+                <!-- CO Title -->
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="fw-bold text-danger">
+                        {{ low.cilo_code }} – {{ low.progress }}%
+                    </span>
+                    <span class="text-muted fst-italic">{{ low.description }}</span>
                 </div>
 
-                {% for low in course.low_cos %}
-                <div class="mb-4 p-3 border rounded">
-                    <!-- CO TITLE + SCORE -->
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="fw-bold text-danger">{{ low.cilo_code }} – {{ low.progress }}%</span>
-                        <span class="text-muted fst-italic">{{ low.description }}</span>
-                    </div>
+                <!-- Recommended topics -->
+                <h6 class="text-secondary fst-italic">Recommended Topics</h6>
 
-                    <!-- Recommended Topics (Top 3) -->
-                    <h6 class=" mb-2 text-secondary fst-italic">Top 3 Recommended Topics</h6>
+                {% set recs = course.recommendations[low.cilo_code]%}
 
-                    {% set recs = course.recommendations[low.cilo_code][:3] %}
-
-                    {% if recs|length == 0 %}
-                    <p class="text-muted">No recommended topics yet.</p>
-                    {% else %}
-                    <div
-                        style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; background: #fafafa;">
-                        {% for t in recs %}
-                        <div class="mb-2 p-2 bg-white rounded shadow-sm">
-                            <strong>{{ t.topic_title }}</strong>
-                            <div class="progress mt-1" style="height: 6px;">
-                                <div class="progress-bar bg-success" style="width: {{ t.percent }}%;"></div>
-                            </div>
-                            <small class="text-muted">Relevance: {{ t.percent }}%</small>
+                {% if recs|length == 0 %}
+                <p class="text-muted">No recommended topics available.</p>
+                {% else %}
+                <div style="max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border-radius: 6px;">
+                    {% for t in recs %}
+                    <div class="mb-2 p-2 bg-white rounded shadow-sm">
+                        <strong>{{ t.topic_title }}</strong>
+                        <div class="progress mt-1">
+                            <div class="progress-bar bg-success" style="width: {{ t.percent }}%;"></div>
                         </div>
-                        {% endfor %}
+                        <small class="text-muted">Relevance: {{ t.percent }}%</small>
                     </div>
-                    {% endif %}
+                    {% endfor %}
                 </div>
-                {% endfor %}
+                {% endif %}
+
             </div>
+            {% endfor %}
         </div>
         {% endif %}
-
     </div>
 </div>
 
+<!-- =====================
+    PAGINATION
+====================== -->
+<div class="d-flex justify-content-center mt-4">
+    <nav>
+        <ul class="pagination">
 
-</div>
-{% endfor %}
+            {% if has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ current_page - 1 }}">Previous</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Previous</span>
+            </li>
+            {% endif %}
+
+            {% for i in range(1, total_pages + 1) %}
+            <li class="page-item {% if i == current_page %}active{% endif %}">
+                <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+            </li>
+            {% endfor %}
+
+            {% if has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ current_page + 1 }}">Next</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Next</span>
+            </li>
+            {% endif %}
+
+        </ul>
+    </nav>
 </div>
 
+<!-- =====================
+    CHART SCRIPT
+====================== -->
 <script>
-    function initializeCharts() {
-        const dataScript = document.getElementById('cilo-data-1');
-        if (!dataScript) return;
+    function loadChart() {
+        const rawData = document.getElementById("cilo-data").textContent;
+        const cilos = JSON.parse(rawData);
 
-        const ciloData = JSON.parse(dataScript.textContent);
-        const labels = ciloData.map(c => c.code);
-        const values = ciloData.map(c => c.progress);
+        const labels = cilos.map(c => c.cilo_code);
+        const values = cilos.map(c => c.progress);
 
-        // CO colors: CO1 green, CO2 yellow, CO3 blue
-        const coColors = [
+        const colors = [
             'rgba(40, 167, 69, 0.8)',
             'rgba(255, 193, 7, 0.8)',
-            'rgba(23, 162, 184, 0.8)'
+            'rgba(23, 162, 184, 0.8)',
+            'rgba(220, 53, 69, 0.8)',
+            'rgba(0, 123, 255, 0.8)'
         ];
 
-        new Chart(document.getElementById('chart-1').getContext('2d'), {
+        new Chart(document.getElementById("cilos-chart").getContext("2d"), {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Mastery',
+                    label: 'Mastery (%)',
                     data: values,
-                    backgroundColor: coColors.slice(0, values.length),
-                    borderColor: 'transparent',
-                    borderWidth: 1,
-                    borderRadius: 4
+                    backgroundColor: colors.slice(0, values.length),
+                    borderWidth: 0,
+                    borderRadius: 5
                 }]
             },
             options: {
@@ -182,20 +224,18 @@
                     x: {
                         min: 0,
                         max: 100,
-                        title: { display: true, text: 'Progress (%)' },
-                        ticks: { callback: v => v + '%' }
+                        ticks: { callback: v => v + "%" }
                     },
                     y: { grid: { display: false } }
                 },
                 plugins: {
-                    legend: { display: false },
-                    tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.x}%` } }
+                    legend: { display: false }
                 }
             }
         });
     }
 
-    window.addEventListener('load', initializeCharts);
+    window.addEventListener("load", loadChart);
 </script>
 
 {% endblock %}

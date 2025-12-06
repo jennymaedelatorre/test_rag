@@ -24,7 +24,7 @@ def get_course_and_student_co_progress(db: Session, course_id: int):
     if not topic_ids:
         return {}, {}
 
-    # Get all answers for these topics (only single attempt per student)
+    # Get all answers for these topics
     answers = (
         db.query(StudentAnswer)
         .join(StudentQuizAttempt, StudentAnswer.attempt_id == StudentQuizAttempt.id)
@@ -35,14 +35,13 @@ def get_course_and_student_co_progress(db: Session, course_id: int):
     if not answers:
         return {}, {}
 
-    # Organize answers by student
     student_answers = {}
     for ans in answers:
         student_answers.setdefault(ans.attempt.student_id, []).append(ans)
 
     # Calculate per-student CO progress
     per_student_co = {}
-    all_co_totals = {}   # For course-average calculation
+    all_co_totals = {}   
     all_co_corrects = {}
 
     for student_id, ans_list in student_answers.items():

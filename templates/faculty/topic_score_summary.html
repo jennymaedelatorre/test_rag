@@ -1,0 +1,79 @@
+{% extends 'faculty/base.html' %}
+
+{% block title %}Student Scores for Topic {{ topic.topic_no }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center ">
+        <h4 class="mt-2">Student Score: {{ topic.title }}</h4>
+        <a href="{{ url_for('view_uploaded_topics', course_id=topic.course_id) }}" class="btn btn-sm btn-secondary py-2 px-4">
+            <i class="fa-solid fa-arrow-left me-2"></i> Back
+        </a>
+    </div>
+    <hr style="width: 90%;">
+    <p class="text-secondary fst-italic ">View Individual Students Score for this topic.</p>
+
+    <div class="row g-3 mb-4">
+        <!-- <div class="col-md-4">
+            <div class="card bg-primary text-white shadow">
+                <div class="card-body">
+                    <h5 class="card-title">Average Score</h5>
+                    <p class="card-text fs-2 fw-bold">{{ avg_score }}%</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white shadow">
+                <div class="card-body">
+                    <h5 class="card-title">Total Attempts</h5>
+                    <p class="card-text fs-2 fw-bold">{{ total_attempts }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning text-dark shadow">
+                <div class="card-body">
+                    <h5 class="card-title">Unique Students</h5>
+                    <p class="card-text fs-2 fw-bold">{{ total_students }}</p>
+                </div>
+            </div>
+        </div> -->
+    </div>
+
+    <!-- <h5>Individual Quiz Attempts</h5> -->
+    {% if attempts %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover shadow-sm">
+            <thead class="table-success text-center">
+                <tr>
+                    <th>Student ID</th>
+                    <th>Full Name</th>
+                    <th>Score</th>
+                    <th>Total Questions</th>
+                    <th>Attempt No.</th>
+                    <th>Submitted At</th>
+                </tr>
+            </thead>
+            <tbody class="text-center">
+                {% for attempt in attempts %}
+                <tr>
+                    <td>{{ attempt.student_id }}</td>
+                    <td>{{ attempt.student.full_name }}</td> <td><span class="badge {% if attempt.score / attempt.total_questions >= 0.7 %}bg-success{% else %}bg-danger{% endif %}">
+                        {{ attempt.score }} / {{ attempt.total_questions }}
+                    </span></td>
+                    <td>{{ attempt.total_questions }}</td>
+                    <td>{{ attempt.attempt_number }}</td>
+                    <td>{{ attempt.end_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="alert alert-info">
+            No submitted quiz attempts found for this topic yet.
+        </div>
+    {% endif %}
+
+</div>
+{% endblock %}

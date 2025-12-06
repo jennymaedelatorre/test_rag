@@ -220,8 +220,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!checkbox.checked || startBtn.classList.contains("disabled")) return;
             e.preventDefault();
 
-            let countdown = 3; // seconds
-            startBtn.classList.add("disabled"); // prevent multiple clicks
+            let countdown = 3;
+            startBtn.classList.add("disabled");
 
             const interval = setInterval(() => {
                 if (countdown > 0) {
@@ -229,7 +229,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     countdown--;
                 } else {
                     clearInterval(interval);
-                    // Redirect to the quiz start URL
                     window.location.href = startBtn.href;
                 }
             }, 1000);

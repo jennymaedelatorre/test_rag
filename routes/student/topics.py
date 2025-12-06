@@ -75,7 +75,7 @@ def view_course_topics_student(
         func.count(GeneratedQuestion.question_id).label('question_count')
     ).group_by(GeneratedQuestion.topic_id).subquery()
 
-    # Fetch Topics, LEFT JOIN with the question count
+   
     results = db.query(
         Topic, 
         questions_count_subquery.c.question_count
@@ -86,7 +86,7 @@ def view_course_topics_student(
         Topic.id == questions_count_subquery.c.topic_id
     ).order_by(Topic.topic_no).all()
     
-    # Process results to attach question_count 
+    
     topics_with_count = []
     for topic, count in results:
         topic.question_count = count if count is not None else 0
@@ -105,7 +105,7 @@ def view_course_topics_student(
 
         topics_with_count.append(topic)
 
-    # Count attempts per topic for each student
+    
     student_attempts = {}
     for topic in topics_with_count:
         attempts_count = db.query(StudentQuizAttempt).filter_by(

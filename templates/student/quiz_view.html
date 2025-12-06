@@ -142,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         // ============================
-        // 1. Live Normalization for Identification/Short Answer
+        // Live Normalization for Identification/Short Answer
         // ============================
         document.querySelectorAll(".identify-input").forEach(input => {
             input.addEventListener("input", () => {
@@ -158,15 +158,15 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             
             // ============================
-            // 2. Final Normalization before Submission
+            //  Final Normalization before Submission
             // ============================
             document.querySelectorAll(".identify-input").forEach(input => {
                 let val = input.value;
                 val = val.toLowerCase();
-                val = val.replace(/\s+/g, " ").trim(); // Final cleanup (lowercase, condense spaces, trim ends)
+                val = val.replace(/\s+/g, " ").trim(); 
                 input.value = val;
             });
-            // ============================
+            
             
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Submitting...';
