@@ -46,7 +46,9 @@ def generate_question_page(request: Request, db: Session = Depends(get_db)):
         }
     )
 
-
+# =========================
+# POST: Generate Quiz
+# =========================
 @faculty_quiz_router.post("/generate_quiz", response_class=JSONResponse)
 async def generate_question(
     request: Request,
@@ -77,6 +79,14 @@ async def generate_question(
     topic_record = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic_record:
         raise HTTPException(status_code=404, detail="Topic not found.")
+    
+    course = topic_record.course
+
+    # Build dynamic CO dict
+    course_outcomes = {
+        cilo.cilo_code.upper(): cilo.description
+        for cilo in course.cilos
+    }
 
     # Check existing questions
     existing_questions_count = db.query(GeneratedQuestion).filter(
@@ -114,9 +124,11 @@ async def generate_question(
             topics=topic_list,
             context=merged_context,
             num_questions=num_questions,
+            course_outcomes=course_outcomes,
             co_tags=co_tag_list,
-            question_type=question_type
+            question_type=question_type,
         )
+
 
         if not isinstance(generated_data, dict):
             raise HTTPException(status_code=500, detail="AI returned invalid data format")
@@ -155,6 +167,7 @@ async def generate_question(
         "status": "success",
         "topic_id": topic_id,
         "topic_title": topic_record.title,
+        "course_outcomes": course_outcomes,
         "generated_questions": questions_list,
         "retrieved_chunks_count": len(all_retrieved_chunks)
     })

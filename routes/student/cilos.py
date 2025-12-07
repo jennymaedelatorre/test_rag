@@ -61,26 +61,32 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db), page: in
     courses = db.query(Course).all()
     total_courses = len(courses)
 
-    # Ensure page is within bounds
     if page < 1:
         page = 1
     if page > total_courses:
         page = total_courses
 
-    # Select ONLY ONE course based on page
+    # Select ONE course based on page
     course = courses[page - 1]
 
     cilos = db.query(CILO).filter(CILO.course_id == course.id).order_by(CILO.cilo_code).all()
 
+    # Compute CO mastery (question-based)
     co_progress_dict = compute_co_progress(db, student.id, course.id)
-    topic_distribution = get_topic_co_distribution(db, course.id)
 
+    # Compute course progress as **average CO mastery**
+    if cilos:
+        course_progress = round(sum(co_progress_dict.get(c.cilo_code, 0) for c in cilos) / len(cilos))
+    else:
+        course_progress = 0
+
+    # Recommendations for low COs
+    topic_distribution = get_topic_co_distribution(db, course.id)
     low_cos = []
     co_recommendations = {}
 
     for c in cilos:
         progress = co_progress_dict.get(c.cilo_code, 0)
-
         if progress < low_co_threshold:
             low_cos.append({
                 "cilo_code": c.cilo_code,
@@ -93,7 +99,6 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db), page: in
             for topic in course.topics:
                 dist = topic_distribution.get(topic.id, {})
                 percent = dist.get(c.cilo_code, 0)
-
                 topic_data = {"topic_title": topic.title, "percent": percent}
 
                 if percent >= 40:
@@ -102,17 +107,6 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db), page: in
                     fallback.append(topic_data)
 
             co_recommendations[c.cilo_code] = primary if primary else fallback
-
-    total_topics = getattr(course, "total_topics", 10)
-    completed_topics = (
-        db.query(StudentCourseProgress)
-        .join(StudentCourseProgress.topic)
-        .filter(StudentCourseProgress.student_id == student.id)
-        .filter(StudentCourseProgress.topic.has(course_id=course.id))
-        .filter(StudentCourseProgress.completed == True)
-        .count()
-    )
-    course_progress = round((completed_topics / total_topics) * 100) if total_topics else 0
 
     cilo_progress_list = [
         {
@@ -132,7 +126,7 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db), page: in
                 "course_title": course.title,
                 "cilos": cilo_progress_list,
                 "low_cos": low_cos,
-                "course_progress": course_progress,
+                "course_progress": course_progress,  # now derived from CO mastery
                 "recommendations": co_recommendations
             },
             "current_page": page,

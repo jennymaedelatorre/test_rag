@@ -45,7 +45,7 @@
 <div class="row mt-4">
   {% for course in courses %}
   <div class="col-md-6 mb-4">
-    <div class="card border-0 shadow-sm course-card h-100">
+    <div class="card border-0 shadow-lg course-card h-100">
       {% if course.code == 'ITE 101' %}
         <img src="/static/imgs/course net.jpg" ...
           style="height: 250px; object-fit: cover; filter:brightness(85%) border-top:10px">
@@ -60,17 +60,23 @@
       <div class="card-body">
         <h5 class="card-title">{{ course.title }}</h5>
         <div class="d-flex justify-content-start">
-            <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle"
+            <!-- <img src="/static/imgs/faculty1.jpg" alt="Profile" class="rounded-circle"
               style="width: 30px; height: 30px; object-fit: cover;">
-            <p class="card-text text-muted ms-2 mt-1">{{ course.instructor.full_name }}</p>
+            <p class="card-text text-muted ms-2 mt-1">{{ course.instructor.full_name }}</p> -->
           </div>
   
-        <div class="d-flex just mt-3">
-          <button class="btn btn-success me-3" data-bs-toggle="modal"
+        <div class="d-flex just mt-3 gap-3 mb-2">
+          <button class="btn btn-success" data-bs-toggle="modal"
             data-bs-target="#cilosModal{{ course.id }}">
             View CILOs
           </button>
+
           <a href="{{ url_for('view_uploaded_topics', course_id=course.id) }}" class="btn btn-success">View Course</a>
+
+          <a href="{{ url_for('upload_topic_page', course_id=course.id) }}" class="btn btn-primary ms-auto"
+            title="Upload new material (PDF) for this course">
+            <i class="fa-solid fa-file-arrow-up me-1"></i> Upload Topic
+          </a>
         </div>
       </div>
     </div>

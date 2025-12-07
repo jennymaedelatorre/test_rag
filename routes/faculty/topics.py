@@ -12,6 +12,16 @@ from collections import defaultdict
 faculty_topics_view_router  = APIRouter(prefix="/faculty/upload", tags=["Faculty"])
 templates = Jinja2Templates(directory="templates")
 
+# Register custom filter
+import json
+def from_json(value):
+    try:
+        return json.loads(value)
+    except Exception:
+        return {}
+
+templates.env.filters["from_json"] = from_json
+
 
 # ---------------------------------
 # GET: View Uploaded Topics 

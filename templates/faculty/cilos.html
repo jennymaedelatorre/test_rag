@@ -44,11 +44,8 @@
             </div>
         </div>
 
-
-        <!-- intervention -->
-
+        <!-- Intervention Students -->
         {% set intervention_list = course_data.intervention_students %}
-
         {% if intervention_list %}
         <div class="col-4 mb-4">
             <div class="card shadow-sm" style="height: 350px;">
@@ -57,7 +54,6 @@
                     <span class="badge bg-light text-danger">{{ intervention_list|length }}</span>
                 </div>
                 <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-
                     {% for item in intervention_list %}
                     <div class="card border-danger shadow-sm mb-3" style="border-radius: 12px; height: 270px;">
                         <div class="card-body d-flex flex-column p-3">
@@ -114,76 +110,62 @@
         </div>
         {% endif %}
 
-
-
         <!-- Individual Student Progress -->
         <div class="col-md-8">
             <div class="card shadow">
                 <div class="card-header bg-success text-white p-3">
                     Individual Student Progress - {{ course_data.course.title }}
-                    <select class="form-select w-auto float-end" id="studentFilter-{{ loop.index }}">
+                    <!-- <select class="form-select w-auto float-end" id="studentFilter-{{ loop.index }}">
                         <option value="all">All Students</option>
                         {% for student in students %}
                         <option value="{{ student.id }}">{{ student.full_name }}</option>
                         {% endfor %}
-                    </select>
+                    </select> -->
                 </div>
                 <div class="card-body">
-                    <div class="row g-4">
-                        {% for student in students %}
-                        <div class="col-12 student-progress" data-student-id="{{ student.id }}"
-                            style="display: {{ loop.index <= 2 and 'block' or 'none' }};">
-                            <div class="card text-center p-3 shadow-sm border-0"
-                                style="border-radius: 15px; background: #fefefe;">
-                                <h6 class="fw-bold mb-1">{{ student.full_name }}</h6>
-                                <small class="text-muted mb-3 d-block">ID: {{ student.id }}</small>
-                                <div class="d-flex justify-content-around flex-wrap">
-                                    {% for cilo in course_data.cilos %}
-                                    {% set progress = course_data.per_student_co.get(student.id, {}).get(cilo.cilo_code,
-                                    0) %}
-                                    {% set color = progress >= 85 and '#28a745' or progress >= 70 and '#17a2b8' or
-                                    progress >= 60 and '#ffc107' or '#dc3545' %}
-                                    <div class="d-flex flex-column align-items-center m-2">
-                                        <svg width="100" height="100">
-                                            <circle cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="10"
-                                                fill="none"></circle>
-                                            <circle cx="50" cy="50" r="40" stroke="{{ color }}" stroke-width="10"
-                                                fill="none" stroke-dasharray="251.2"
-                                                stroke-dashoffset="{{ 251.2 - (251.2 * progress / 100) }}"
-                                                transform="rotate(-90 50 50)"></circle>
-                                            <text x="50" y="55" text-anchor="middle" font-size="16" fill="#333">{{
-                                                progress }}%</text>
-                                        </svg>
-                                        <small class="fw-bold mt-2">{{ cilo.cilo_code }}</small>
+                    <div class="student-progress-container" style="max-height: 500px; overflow-y: auto;">
+                        <div class="row g-4">
+                            {% for student in students %}
+                            <div class="col-12 student-progress" data-student-id="{{ student.id }}">
+                                <div class="card text-center p-3 shadow-sm border-0" style="border-radius: 15px; background: #fefefe;">
+                                    <h6 class="fw-bold mb-1">{{ student.full_name }}</h6>
+                                    <small class="text-muted mb-3 d-block">ID: {{ student.id }}</small>
+                                    <div class="d-flex justify-content-around flex-wrap">
+                                        {% for cilo in course_data.cilos %}
+                                        {% set progress = course_data.per_student_co.get(student.id, {}).get(cilo.cilo_code, 0) %}
+                                        {% set color = progress >= 85 and '#28a745' or progress >= 70 and '#17a2b8' or progress >= 60 and '#ffc107' or '#dc3545' %}
+                                        <div class="d-flex flex-column align-items-center m-2">
+                                            <svg width="100" height="100">
+                                                <circle cx="50" cy="50" r="40" stroke="#e9ecef" stroke-width="10" fill="none"></circle>
+                                                <circle cx="50" cy="50" r="40" stroke="{{ color }}" stroke-width="10" fill="none" stroke-dasharray="251.2" stroke-dashoffset="{{ 251.2 - (251.2 * progress / 100) }}" transform="rotate(-90 50 50)"></circle>
+                                                <text x="50" y="55" text-anchor="middle" font-size="16" fill="#333">{{ progress }}%</text>
+                                            </svg>
+                                            <small class="fw-bold mt-2">{{ cilo.cilo_code }}</small>
+                                        </div>
+                                        {% endfor %}
                                     </div>
-                                    {% endfor %}
                                 </div>
                             </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </div>
-
 
                     <!-- Legend -->
                     <div class="mt-4 d-flex justify-content-center gap-3 flex-wrap">
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block"
-                                style="width: 15px; height: 15px; background: #28a745; border-radius: 50%;"></span>
+                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #28a745; border-radius: 50%;"></span>
                             <small>Excellent (≥85%)</small>
                         </div>
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block"
-                                style="width: 15px; height: 15px; background: #17a2b8; border-radius: 50%;"></span>
+                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #17a2b8; border-radius: 50%;"></span>
                             <small>Good (70–84%)</small>
                         </div>
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block"
-                                style="width: 15px; height: 15px; background: #ffc107; border-radius: 50%;"></span>
+                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #ffc107; border-radius: 50%;"></span>
                             <small>Average (61–69%)</small>
                         </div>
                         <div class="d-flex align-items-center gap-1">
-                            <span class="d-inline-block"
-                                style="width: 15px; height: 15px; background: #dc3545; border-radius: 50%;"></span>
+                            <span class="d-inline-block" style="width: 15px; height: 15px; background: #dc3545; border-radius: 50%;"></span>
                             <small>Poor (<60%)</small>
                         </div>
                     </div>
@@ -208,6 +190,7 @@
     </div>
     {% endfor %}
 </div>
+
 {% endblock %}
 
 {% block footer_scripts %}
@@ -219,7 +202,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const labels{{ course_data.course.id }} = {{ course_data.co_avg.keys() | list | tojson }};
     const data{{ course_data.course.id }} = {{ course_data.co_avg.values() | list | tojson }};
 
-    // Fixed CO colors
     const coColors{{ course_data.course.id }} = [
         'rgba(40, 167, 69, 0.8)',
         'rgba(255, 193, 7, 0.8)',
@@ -239,16 +221,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }]
         },
         options: {
-            indexAxis: 'y', // horizontal bars
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { 
-                    min: 0, 
-                    max: 100, 
-                    ticks: { callback: v => v + '%' }, 
-                    title: { display: true, text: 'Average Score' } 
-                },
+                x: { min: 0, max: 100, ticks: { callback: v => v + '%' }, title: { display: true, text: 'Average Score' } },
                 y: { title: { display: true, text: 'CO' } }
             },
             plugins: { legend: { display: false } }
@@ -272,4 +249,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<style>
+.student-progress-container {
+    max-height: 500px;  
+    overflow-y: auto;
+    padding-right: 5px; 
+    overflow-x: hidden;
+}
+
+.student-progress-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.student-progress-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 4px;
+}
+
+.student-progress-container::-webkit-scrollbar-track {
+    background-color: #f0f0f0;
+    border-radius: 4px;
+}
+</style>
 {% endblock %}
