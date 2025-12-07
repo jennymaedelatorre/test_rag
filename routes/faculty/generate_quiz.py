@@ -88,6 +88,7 @@ async def generate_question(
         for cilo in course.cilos
     }
 
+
     # Check existing questions
     existing_questions_count = db.query(GeneratedQuestion).filter(
         GeneratedQuestion.topic_id == topic_id
@@ -167,7 +168,6 @@ async def generate_question(
         "status": "success",
         "topic_id": topic_id,
         "topic_title": topic_record.title,
-        "course_outcomes": course_outcomes,
         "generated_questions": questions_list,
         "retrieved_chunks_count": len(all_retrieved_chunks)
     })

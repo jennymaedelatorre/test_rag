@@ -100,7 +100,7 @@ class MCQGeneratorChain:
         topics: List[str],
         context: str,
         num_questions: int,
-        course_outcomes: Dict[str, str],  
+        course_outcomes: Dict[str, str],   # 🆕 dynamic COs
         co_tags: List[str],
         question_type: Optional[str] = None,
     ) -> Dict:
@@ -109,6 +109,7 @@ class MCQGeneratorChain:
             raise ValueError("CO tags cannot be empty.")
 
         filtered_cos = {tag: course_outcomes[tag] for tag in co_tags if tag in course_outcomes}
+
         co_defs = format_co_definitions(filtered_cos)
 
         # Determine instruction for question type
@@ -137,12 +138,12 @@ class MCQGeneratorChain:
             # Call LLM
             response = self.llm.invoke(formatted_prompt)
 
-            print("=== LLM RAW OUTPUT ===")
-            print(response)
-
             print("=== COURSE OUTCOMES USED ===")
             for code, desc in course_outcomes.items():
                 print(code, "→", desc)
+
+            print("=== LLM RAW OUTPUT ===")
+            print(response)
 
             if isinstance(response, dict):
                 data = response
