@@ -46,7 +46,7 @@
   {% for course in courses %}
   <div class="col-md-6 mb-4">
     <div class="card border-0 shadow-lg course-card h-100">
-      {% if course.code == 'ITE 101' %}
+      {% if course.code == 'CSC 105' %}
         <img src="/static/imgs/course net.jpg" ...
           style="height: 250px; object-fit: cover; filter:brightness(85%) border-top:10px">
         {% elif course.code == 'ITE 10' %}
@@ -54,7 +54,7 @@
         {% elif course.code == 'LIE' %}
         <img src="/static/imgs/lie.jpg" ... style="height: 250px; object-fit: cover; filter:brightness(85%)">
         {% else %}
-        <img src="/static/imgs/default course.jpg" ...>
+        <img src="/static/imgs/default course.jpg" ... style="height: 250px; object-fit: cover; filter:brightness(85%)">
         {% endif %}
 
       <div class="card-body">

@@ -44,7 +44,7 @@
     <div class="row g-4">
 
         <div class="col-lg-6">
-            <div class="card shadow-sm border-0" style="height: 480px;">
+            <div class="card shadow-sm border-0" style="height: 550px;">
                 <div class="card-body">
                     <form id="generateFormAlt">
                         <div class="mb-3">
@@ -86,8 +86,8 @@
                             </div>
                         </div>
 
-                        <div class="d-grid mt-4">
-                            <button id="generateBtnAlt" type="submit" class="btn btn-success fw-bold py-2 mt-4">
+                        <div class="d-grid">
+                            <button id="generateBtnAlt" type="submit" class="btn btn-success fw-bold py-2 mt-2">
                                 <span id="btnTextAlt">⚡ Generate Questions</span>
                                 <div id="spinnerAlt" class="spinner-border spinner-border-sm ms-2" style="display: none;"></div>
                             </button>
@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const saveBtnText = document.createElement('span'); 
     saveBtnText.textContent = 'Save Questions';
     const saveSpinner = document.createElement('i');
-    saveSpinner.className = 'fa-solid fa-floppy-disk me-2'; // Use an icon instead of spinner on load
+    saveSpinner.className = 'fa-solid fa-floppy-disk me-2'; 
     const loadingSpinner = document.createElement('div');
     loadingSpinner.className = 'spinner-border spinner-border-sm me-2';
     loadingSpinner.style.display = 'none';
@@ -260,16 +260,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     const escapedQuestion = escapeHtml(q.question);
 
+                    const courseCOs = data.course_cos;
+
                     li.innerHTML = `
                         <div class="mb-2"><strong>Q${idx+1}:</strong> ${escapedQuestion}</div>
                         ${optionsHtml ? `<ul class="list-group mb-3">${optionsHtml}</ul>` : ''}
                         ${answerDisplayHtml}
                         <div class="mt-2">
                             <label class="form-label text-secondary mb-1">CO Tag</label>
-                            <div class="d-flex flex-wrap gap-2">
-                                <span class="badge ${q.co_tag === 'CO1' ? 'bg-success text-white' : 'bg-outline-secondary text-dark border'} px-3 py-2 rounded-pill co-tag" style="cursor:pointer;">CO1</span>
-                                <span class="badge ${q.co_tag === 'CO2' ? 'bg-success text-white' : 'bg-outline-secondary text-dark border'} px-3 py-2 rounded-pill co-tag" style="cursor:pointer;">CO2</span>
-                                <span class="badge ${q.co_tag === 'CO3' ? 'bg-success text-white' : 'bg-outline-secondary text-dark border'} px-3 py-2 rounded-pill co-tag" style="cursor:pointer;">CO3</span>
+                            <div class="d-flex flex-wrap gap-2" id="coTagContainer-${idx}">
+                                ${courseCOs.map(co => `
+                                    <span class="badge ${q.co_tag === co ? 'bg-success text-white' : 'bg-outline-secondary text-dark border'} px-3 py-2 rounded-pill co-tag" style="cursor:pointer;">${co}</span>
+                                `).join('')}
                             </div>
                             <small class="text-muted d-block mt-1">Click to select/change CO tag.</small>
                         </div>

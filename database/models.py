@@ -142,6 +142,13 @@ class GeneratedQuestion(Base):
     source_topic = relationship("Topic", back_populates="generated_questions")
     generator = relationship("User", back_populates="generated_questions")
 
+    answers = relationship(
+        "StudentAnswer",
+        back_populates="question",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
 
 
 class StudentQuizAttempt(Base):
@@ -185,7 +192,7 @@ class StudentAnswer(Base):
 
     # Relationships
     attempt = relationship("StudentQuizAttempt", back_populates="answers")
-    question = relationship("GeneratedQuestion")
+    question = relationship("GeneratedQuestion", back_populates="answers")
 
 
 class StudentCOPerformance(Base):

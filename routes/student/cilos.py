@@ -60,60 +60,47 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db), page: in
 
     courses = db.query(Course).all()
     total_courses = len(courses)
-
-    if page < 1:
-        page = 1
-    if page > total_courses:
-        page = total_courses
-
-    # Select ONE course based on page
+    page = max(1, min(page, total_courses))
     course = courses[page - 1]
 
     cilos = db.query(CILO).filter(CILO.course_id == course.id).order_by(CILO.cilo_code).all()
-
-    # Compute CO mastery (question-based)
     co_progress_dict = compute_co_progress(db, student.id, course.id)
 
-    # Compute course progress as **average CO mastery**
-    if cilos:
-        course_progress = round(sum(co_progress_dict.get(c.cilo_code, 0) for c in cilos) / len(cilos))
-    else:
-        course_progress = 0
+    total_topics = course.total_topics or 10
+    completed_topics_count = db.query(StudentCourseProgress).join(StudentCourseProgress.topic)\
+        .filter(StudentCourseProgress.student_id == student.id)\
+        .filter(StudentCourseProgress.topic.has(course_id=course.id))\
+        .filter(StudentCourseProgress.completed == True).count()
 
-    # Recommendations for low COs
-    topic_distribution = get_topic_co_distribution(db, course.id)
+    course_progress = round((completed_topics_count / total_topics) * 100) if total_topics else 0
+    show_low_co_card = completed_topics_count >= 6
+
     low_cos = []
     co_recommendations = {}
-
-    for c in cilos:
-        progress = co_progress_dict.get(c.cilo_code, 0)
-        if progress < low_co_threshold:
-            low_cos.append({
-                "cilo_code": c.cilo_code,
-                "description": c.description,
-                "progress": progress
-            })
-
-            primary = []
-            fallback = []
-            for topic in course.topics:
-                dist = topic_distribution.get(topic.id, {})
-                percent = dist.get(c.cilo_code, 0)
-                topic_data = {"topic_title": topic.title, "percent": percent}
-
-                if percent >= 40:
-                    primary.append(topic_data)
-                elif percent > 0:
-                    fallback.append(topic_data)
-
-            co_recommendations[c.cilo_code] = primary if primary else fallback
+    if show_low_co_card:
+        topic_distribution = get_topic_co_distribution(db, course.id)
+        for c in cilos:
+            progress = co_progress_dict.get(c.cilo_code, 0)
+            if progress < low_co_threshold:
+                low_cos.append({
+                    "cilo_code": c.cilo_code,
+                    "description": c.description,
+                    "progress": progress
+                })
+                primary = []
+                fallback = []
+                for topic in course.topics:
+                    dist = topic_distribution.get(topic.id, {})
+                    percent = dist.get(c.cilo_code, 0)
+                    topic_data = {"topic_title": topic.title, "percent": percent}
+                    if percent >= 40:
+                        primary.append(topic_data)
+                    elif percent > 0:
+                        fallback.append(topic_data)
+                co_recommendations[c.cilo_code] = primary if primary else fallback
 
     cilo_progress_list = [
-        {
-            "cilo_code": c.cilo_code,
-            "description": c.description,
-            "progress": co_progress_dict.get(c.cilo_code, 0)
-        }
+        {"cilo_code": c.cilo_code, "description": c.description, "progress": co_progress_dict.get(c.cilo_code, 0)}
         for c in cilos
     ]
 
@@ -126,7 +113,7 @@ def view_cilos_student(request: Request, db: Session = Depends(get_db), page: in
                 "course_title": course.title,
                 "cilos": cilo_progress_list,
                 "low_cos": low_cos,
-                "course_progress": course_progress,  # now derived from CO mastery
+                "course_progress": course_progress,
                 "recommendations": co_recommendations
             },
             "current_page": page,

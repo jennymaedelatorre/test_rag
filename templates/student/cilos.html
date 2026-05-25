@@ -98,7 +98,7 @@
             LOW CO SECTION
         ====================== -->
         {% if course.course_progress >= 60 and course.low_cos|length > 0 %}
-        <div class="card shadow mb-5">
+        <div class="card shadow mb-5 ms-2">
             <div class="p-3">
                 <h5 class="fw-bold text-danger">Low Course Outcomes (Below {{ low_co_threshold }}%)</h5>
 
@@ -132,9 +132,9 @@
                     {% for t in recs %}
                     <div class="mb-2 p-2 bg-white rounded shadow-sm">
                         <strong>{{ t.topic_title }}</strong>
-                        <div class="progress mt-1">
+                        <!-- <div class="progress mt-1">
                             <div class="progress-bar bg-success" style="width: {{ t.percent }}%;"></div>
-                        </div>
+                        </div> -->
                         <small class="text-muted">Relevance: {{ t.percent }}%</small>
                     </div>
                     {% endfor %}

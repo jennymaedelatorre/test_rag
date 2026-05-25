@@ -15,6 +15,15 @@
     <hr style="width: 80%;">
     <p class="text-secondary fst-italic ms-2 mb-4">View and Check your Uploaded Material for this Course.</p>
 
+     <!-- Flash Message -->
+    {% if flashed.message %}
+    <div class="alert flash-alert alert-{{ flashed.category }} alert-dismissible fade show mt-3" role="alert">
+        <h6 class="mb-1">{{ flashed.icon | safe }} <strong>{{ flashed.title }}</strong></h6>
+        <p class="mb-0">{{ flashed.message }}</p>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
     {% if topics %}
         <div class="row g-4">
         {% for topic in topics %}
@@ -36,6 +45,10 @@
                                     <a href="{{ url_for('download_topic_file', topic_id=topic.id) }}" class="btn btn-sm btn-outline-secondary">
                                         <i class="bi bi-download"></i> Download Material
                                     </a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal"
+                                        data-bs-target="#deleteTopicModal{{ topic.id }}">
+                                        <i class="fa-solid fa-trash-can fa-lg"></i> Delete Topic
+                                    </button>
                                 </div>
                             </div>
 
@@ -43,7 +56,29 @@
                                 <a href="{{ url_for('view_generated_quiz', topic_id=topic.id) }}" class="btn btn-sm bg-success text-white py-2 px-2">View Generated Quiz</a>
                                 <a href="{{ url_for('view_students_score', topic_id=topic.id) }}" class="btn btn-sm bg-warning text-white py-2 px-2">VIew Students Score</a>
                             </div>
-                            
+
+
+                            <!--  Delete Modal -->
+                            <div class="modal fade" id="deleteTopicModal{{ topic.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ topic.id }}"
+                                aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-danger text-white">
+                                            <h5 class="modal-title" id="deleteTopicModalLabel{{ topic.id }}">Confirm Delete</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            Are you sure you want to delete <strong>{{ topic.title }}</strong>? This cannot be undone.
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <form action="{{ url_for('delete_topics', topic_id=topic.id) }}" method="POST">
+                                                <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                         </div>
                     </div>
@@ -52,10 +87,28 @@
         {% endfor %}
         </div>
     {% else %}
-        <div class="alert alert-info mt-3 text-center" role="alert">
+        <div class="alert alert-info mt-3 text-center" role="alert-mess">
             <h4 class="alert-heading">No Topics Available</h4>
             <p>The instructor has not uploaded any topics for this course yet.</p>
         </div>
     {% endif %}
 </div>
+
+<script>
+    // Auto-hide only flash messages
+    window.addEventListener('DOMContentLoaded', () => {
+        const alerts = document.querySelectorAll('.flash-alert');
+        alerts.forEach(alert => {
+            setTimeout(() => {
+                alert.classList.remove('show');
+                alert.classList.add('fade');
+                setTimeout(() => alert.remove(), 300);
+            }, 5000);
+        });
+    });
+</script>
+
+
+
 {% endblock %}
+

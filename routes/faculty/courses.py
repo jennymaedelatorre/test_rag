@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.templating import Jinja2Templates
 from database.session import get_db
-from database.models import Course, User, CILO
+from database.models import Course, User, CILO, GeneratedQuestion
 from fastapi import Form, Request
 from utils.flash import get_flashed_messages, flash
 
@@ -75,16 +75,34 @@ def edit_cilo(
 ):
     try:
         cilo = db.query(CILO).filter(CILO.id == cilo_id).first()
-        if cilo:
-            cilo.cilo_code = cilo_code
-            cilo.description = description
-            db.commit()
-            flash(request, "Course Outcome updated successfully!", "success")
-        else:
+        if not cilo:
             flash(request, "Course Outcome not found.", "danger")
+            return RedirectResponse(url="/faculty/courses", status_code=303)
+
+        # Check if any generated questions are mapped to this CO
+        mapped_questions = db.query(GeneratedQuestion).join(GeneratedQuestion.source_topic).filter(
+            GeneratedQuestion.co_tag == cilo.cilo_code,
+            GeneratedQuestion.source_topic.has(course_id=cilo.course_id)
+        ).count()
+
+        if mapped_questions > 0:
+            flash(
+                request,
+                f"Cannot update '{cilo.cilo_code}' because {mapped_questions} question(s) are already mapped to it.",
+                "warning"
+            )
+            return RedirectResponse(url="/faculty/courses", status_code=303)
+
+        # Safe to update
+        cilo.cilo_code = cilo_code
+        cilo.description = description
+        db.commit()
+        flash(request, "Course Outcome updated successfully!", "success")
+
     except Exception as e:
         db.rollback()
         flash(request, f"Error updating CO: {str(e)}", "danger")
+
     return RedirectResponse(url="/faculty/courses", status_code=303)
 
 
@@ -99,13 +117,32 @@ def delete_cilo(
 ):
     try:
         cilo = db.query(CILO).filter(CILO.id == cilo_id).first()
-        if cilo:
-            db.delete(cilo)
-            db.commit()
-            flash(request, "Course Outcome deleted successfully!", "success")
-        else:
+        if not cilo:
             flash(request, "Course Outcome not found.", "danger")
+            return RedirectResponse(url="/faculty/courses", status_code=303)
+
+        # Check if any generated questions are mapped to this CO
+        mapped_questions = db.query(GeneratedQuestion).join(GeneratedQuestion.source_topic).filter(
+            GeneratedQuestion.co_tag == cilo.cilo_code,
+            GeneratedQuestion.source_topic.has(course_id=cilo.course_id)
+        ).count()
+
+
+        if mapped_questions > 0:
+            flash(
+                request,
+                f"Cannot delete '{cilo.cilo_code}' because {mapped_questions} question(s) are already mapped to it.",
+                "warning"
+            )
+            return RedirectResponse(url="/faculty/courses", status_code=303)
+
+        # Safe to delete
+        db.delete(cilo)
+        db.commit()
+        flash(request, "Course Outcome deleted successfully!", "success")
+
     except Exception as e:
         db.rollback()
         flash(request, f"Error deleting CO: {str(e)}", "danger")
+
     return RedirectResponse(url="/faculty/courses", status_code=303)

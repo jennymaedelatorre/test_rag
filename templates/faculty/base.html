@@ -75,18 +75,20 @@
       <ul class="sidebar-nav">
         <li class="sidebar-item">
           <a href="/faculty/dashboard"
-            class="sidebar-link {% if request.url.path == '/faculty/dashboard' %}active{% endif %}">
+            class="sidebar-link {% if request.url.path.startswith('/faculty/dashboard') %}active{% endif %}">
             <i class="fa-solid fa-chart-simple"></i>
             <span>Dashboard</span>
           </a>
         </li>
+
         <li class="sidebar-item">
           <a href="/faculty/courses"
-            class="sidebar-link {% if request.url.path == '/faculty/courses' %}active{% endif %}">
+            class="sidebar-link {% if request.url.path.startswith('/faculty/courses') or request.url.path.startswith('/faculty/course') %}active{% endif %}">
             <i class="fa-solid fa-chalkboard-teacher"></i>
             <span>Courses</span>
           </a>
         </li>
+
         <!-- <li class="sidebar-item">
           <a href="/faculty/course/{{ current_id }}/upload_topic"
             class="sidebar-link {% if request.url.path.startswith('/faculty/course') and request.url.path.endswith('upload_topic') %}active{% endif %}">
@@ -94,20 +96,23 @@
             <span>Upload Topic</span>
           </a>
         </li> -->
+
         <li class="sidebar-item">
           <a href="/faculty/generate_quiz"
-            class="sidebar-link {% if request.url.path == '/faculty/generate_quiz' %}active{% endif %}">
+            class="sidebar-link {% if request.url.path.startswith('/faculty/generate_quiz') %}active{% endif %}">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
             <span>Generate Quiz</span>
           </a>
         </li>
+
         <li class="sidebar-item">
-          <a href="/faculty/cilos" class="sidebar-link {% if request.url.path == '/faculty/cilos' %}active{% endif %}">
+          <a href="/faculty/cilos" class="sidebar-link {% if request.url.path.startswith('/faculty/cilos') %}active{% endif %}">
             <i class="fa-solid fa-chart-pie"></i>
             <span>CILOs</span>
           </a>
         </li>
-      </ul>
+    </ul>
+
 
       <div class="sidebar-footer">
         <a href="/auth/logout" class="sidebar-link">

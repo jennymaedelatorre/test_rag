@@ -49,13 +49,7 @@ STRICT RULES PER QUESTION TYPE
 ==========================================================
 STRICT RULES PER CO TAG
 ==========================================================
-
-CO1 – Fundamentals  
-CO2 – Recent Developments  
-CO3 – Analyze Solutions (MCQ only, scenario-based)
-
-==========================================================
-CONTEXT DEFINITIONS:
+Use the following CO tags for question distribution:
 {co_definitions}
 
 ==========================================================
@@ -100,7 +94,7 @@ class MCQGeneratorChain:
         topics: List[str],
         context: str,
         num_questions: int,
-        course_outcomes: Dict[str, str],   # 🆕 dynamic COs
+        course_outcomes: Dict[str, str],   #  dynamic COs
         co_tags: List[str],
         question_type: Optional[str] = None,
     ) -> Dict:

@@ -4,9 +4,10 @@ from sqlalchemy.orm import Session
 from starlette.templating import Jinja2Templates
 from database.models import Topic, GeneratedQuestion, StudentQuizAttempt, StudentAnswer, Course
 from database.session import get_db
-from utils.flash import get_flashed_messages
+from utils.flash import flash, get_flashed_messages
 from sqlalchemy import func, distinct, cast, Float
 from collections import defaultdict
+import os
 
 
 faculty_topics_view_router  = APIRouter(prefix="/faculty/upload", tags=["Faculty"])
@@ -46,7 +47,9 @@ def view_uploaded_topics(course_id: int, request: Request, db: Session = Depends
         "flashed": flashed,
     })
 
-# ---  View Generated Quiz Route ---
+# ==============================
+# GEt: View Generated Quiz Route 
+# ==================================
 @faculty_topics_view_router.get(
     "/topic/{topic_id}/view-quiz", 
     response_class=HTMLResponse, 
@@ -119,3 +122,38 @@ def view_students_score(topic_id: int, request: Request, db: Session = Depends(g
         "total_attempts": len(attempts),
         "flashed": flashed,
     })
+
+# ---------------------------------
+# POST: Delete Topic
+# ---------------------------------
+@faculty_topics_view_router.post("/delete-topics/{topic_id}", name="delete_topics")
+def delete_topic(topic_id: int, request: Request, db: Session = Depends(get_db)):
+    if not request.session.get("user_id"):
+        return RedirectResponse(url="/auth/login", status_code=303)
+
+    
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+        
+        return RedirectResponse(url="/faculty/upload_topic", status_code=303)
+
+    course_id = topic.course_id
+    topic_title = topic.title  
+
+    # Delete file if exists
+    if topic.file_path and os.path.exists(topic.file_path):
+        try:
+            os.remove(topic.file_path)
+        except Exception as e:
+            print(f"Warning: Could not delete file {topic.file_path}: {e}")
+
+    # Delete from DB
+    db.delete(topic)
+    db.commit()
+
+    flash(request, f"Topic '{topic.title}' deleted successfully!", "success")
+
+    return RedirectResponse(
+        url=f"/faculty/course/{course_id}/view-topics",
+        status_code=303
+    )

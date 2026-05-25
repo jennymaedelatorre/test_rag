@@ -33,7 +33,17 @@ def generate_question_page(request: Request, db: Session = Depends(get_db)):
         request.session.clear()
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    topics = db.query(Topic).filter(Topic.uploaded_by == user_id).all()
+    topics = (
+        db.query(Topic)
+        .filter(
+            Topic.uploaded_by == user_id,
+            ~db.query(GeneratedQuestion)
+             .filter(GeneratedQuestion.topic_id == Topic.id)
+             .exists()
+        )
+        .all()
+    )
+
     flashed = get_flashed_messages(request)
 
     return templates.TemplateResponse(
@@ -87,6 +97,24 @@ async def generate_question(
         cilo.cilo_code.upper(): cilo.description
         for cilo in course.cilos
     }
+
+    # --- Validate CO tags ---
+    valid_co_tags = list(course_outcomes.keys())
+    invalid = [tag for tag in co_tag_list if tag not in valid_co_tags]
+
+    if invalid:
+        return JSONResponse({
+            "status": "error",
+            "redirect": False,
+            "flash": {
+                "category": "warning",
+                "title": "Invalid CO Tag",
+                "message": (
+                    f"Invalid CO tag(s): {', '.join(invalid)}. "
+                    f"Allowed only: {', '.join(valid_co_tags)}"
+                )
+            }
+        })
 
 
     # Check existing questions
@@ -169,7 +197,8 @@ async def generate_question(
         "topic_id": topic_id,
         "topic_title": topic_record.title,
         "generated_questions": questions_list,
-        "retrieved_chunks_count": len(all_retrieved_chunks)
+        "retrieved_chunks_count": len(all_retrieved_chunks),
+        "course_cos": valid_co_tags
     })
 
 

@@ -111,24 +111,28 @@
       <ul class="sidebar-nav">
         <li class="sidebar-item">
           <a href="/student/dashboard"
-            class="sidebar-link {% if request.url.path == '/student/dashboard' %}active{% endif %}">
+            class="sidebar-link {% if request.url.path.startswith('/student/dashboard') %}active{% endif %}">
             <i class="fa-solid fa-chart-simple"></i>
             <span>Dashboard</span>
           </a>
         </li>
+
         <li class="sidebar-item">
           <a href="/student/courses"
-            class="sidebar-link {% if request.url.path == '/student/courses' %}active{% endif %}">
+            class="sidebar-link {% if '/student/course/' in request.url.path or request.url.path.startswith('/student/courses') %}active{% endif %}">
             <i class="fa-solid fa-chalkboard-teacher"></i>
             <span>Courses</span>
           </a>
         </li>
+
         <li class="sidebar-item">
-          <a href="/student/cilos" class="sidebar-link {% if request.url.path == '/student/cilos' %}active{% endif %}">
+          <a href="/student/cilos"
+            class="sidebar-link {% if request.url.path.startswith('/student/cilos') %}active{% endif %}">
             <i class="fa-solid fa-chart-pie"></i>
             <span>CILOs</span>
           </a>
         </li>
+
       </ul>
 
       <div class="sidebar-footer">
