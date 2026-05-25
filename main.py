@@ -99,4 +99,5 @@ def root():
 #         logging.error(f"DB retrieval error: {e}")
 #         raise HTTPException(status_code=500, detail=f"Failed to retrieve document list: {e}")
 
+# source env/Scripts/activate
 # Run command: uvicorn main:app --reload

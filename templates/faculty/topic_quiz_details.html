@@ -32,16 +32,18 @@
                     <p class="card-text fw-bold">{{ question.question_text }}</p>
                     
                     {% if question.question_type == 'mcq' and question.options_json %}
-                        <h6>Options:</h6>
-                        <ul class="list-group list-group-flush mb-3">
-                            {% set options = question.options_json | from_json %}
-                            {% for key, value in options.items() %}
-                                <li class="list-group-item py-1 {% if value == question.correct_answer %}list-group-item-success fw-bold{% endif %}">
-                                    {{ key }}. {{ value }}
-                                </li>
-                            {% endfor %}
-                        </ul>
+                    <h6>Options:</h6>
+                    <ul class="list-group list-group-flush mb-3">
+                        {% set options = question.options_json | from_json %}
+                        {% for option in options %}
+                        <li
+                            class="list-group-item py-1 {% if option == question.correct_answer %}list-group-item-success fw-bold{% endif %}">
+                            {{ option }}
+                        </li>
+                        {% endfor %}
+                    </ul>
                     {% endif %}
+
 
                     <div class="alert alert-success mt-2 p-2 small text-success ">
                         <strong>Correct Answer:</strong> {{ question.correct_answer }}

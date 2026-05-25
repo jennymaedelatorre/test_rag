@@ -8,14 +8,6 @@ from langchain.prompts import (
 )
 from core.gemini_llm import GeminiLLM
 
-# ================================================================
-# 1. COURSE OUTCOMES
-# ================================================================
-COURSE_OUTCOMES: Dict[str, str] = {
-    "CO1": "Explain fundamental principles, concepts and evolution of computing systems.",
-    "CO2": "Expound in the recent developments in the different computing knowledge areas.",
-    "CO3": "Analyze solutions employed by organizations to address different computing issues."
-}
 
 def format_co_definitions(co_dict: Dict[str, str]) -> str:
     formatted = "\n"
@@ -57,13 +49,7 @@ STRICT RULES PER QUESTION TYPE
 ==========================================================
 STRICT RULES PER CO TAG
 ==========================================================
-
-CO1 – Fundamentals  
-CO2 – Recent Developments  
-CO3 – Analyze Solutions (MCQ only, scenario-based)
-
-==========================================================
-CONTEXT DEFINITIONS:
+Use the following CO tags for question distribution:
 {co_definitions}
 
 ==========================================================
@@ -108,13 +94,16 @@ class MCQGeneratorChain:
         topics: List[str],
         context: str,
         num_questions: int,
+        course_outcomes: Dict[str, str],   #  dynamic COs
         co_tags: List[str],
-        question_type: Optional[str] = None,  
+        question_type: Optional[str] = None,
     ) -> Dict:
+
         if not co_tags:
             raise ValueError("CO tags cannot be empty.")
 
-        filtered_cos = {tag: COURSE_OUTCOMES[tag] for tag in co_tags if tag in COURSE_OUTCOMES}
+        filtered_cos = {tag: course_outcomes[tag] for tag in co_tags if tag in course_outcomes}
+
         co_defs = format_co_definitions(filtered_cos)
 
         # Determine instruction for question type
@@ -142,6 +131,11 @@ class MCQGeneratorChain:
         try:
             # Call LLM
             response = self.llm.invoke(formatted_prompt)
+
+            print("=== COURSE OUTCOMES USED ===")
+            for code, desc in course_outcomes.items():
+                print(code, "→", desc)
+
             print("=== LLM RAW OUTPUT ===")
             print(response)
 

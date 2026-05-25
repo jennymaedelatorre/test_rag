@@ -7,13 +7,13 @@ class GeminiLLM(LLM):
 
     def _call(self, prompt: str, stop=None) -> str:
         """Call the Gemini 2.0 Flash model."""
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
         return response.text
 
     @property
     def _identifying_params(self):
-        return {"model_name": "gemini-2.0-flash"}
+        return {"model_name": "gemini-2.5-flash"}
 
     @property
     def _llm_type(self):

@@ -14,9 +14,9 @@ student_dashboard_router = APIRouter(prefix="/student", tags=["Student"])
 templates = Jinja2Templates(directory="templates")
 
 
+
 @student_dashboard_router.get("/dashboard", response_class=HTMLResponse)
 def student_dashboard(request: Request, db: Session = Depends(get_db)):
-    # Login check
     user_id = request.session.get("user_id")
     if not user_id:
         return RedirectResponse(url="/auth/login", status_code=303)
@@ -25,24 +25,18 @@ def student_dashboard(request: Request, db: Session = Depends(get_db)):
     if not student:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    # All courses
     courses = db.query(Course).all()
     course_count = len(courses)
+    selected_course = random.choice(courses) if courses else None
 
-    # Pick a random course
-    if courses:
-        selected_course = random.choice(courses)
-    else:
-        selected_course = None
-
-    # Quizzes completed by student
+    # Completed quizzes (all submitted attempts)
     completed_quizzes = (
         db.query(StudentQuizAttempt)
-        .filter(StudentQuizAttempt.student_id == student.id)
-        .filter(StudentQuizAttempt.submitted == True)
+        .filter(StudentQuizAttempt.student_id == student.id, StudentQuizAttempt.submitted == True)
         .count()
     )
 
+    # Selected course progress (for charting or CO progress)
     if selected_course:
         total_topics = selected_course.total_topics or 0
 
@@ -50,7 +44,7 @@ def student_dashboard(request: Request, db: Session = Depends(get_db)):
             db.query(StudentCourseProgress)
             .join(StudentCourseProgress.topic)
             .filter(StudentCourseProgress.student_id == student.id)
-            .filter(Topic.course_id == selected_course.id)
+            .filter(StudentCourseProgress.topic.has(course_id=selected_course.id))
             .filter(StudentCourseProgress.completed == True)
             .count()
         )
@@ -59,11 +53,23 @@ def student_dashboard(request: Request, db: Session = Depends(get_db)):
     else:
         course_progress = 0
 
-    # Pending quizzes
-    total_quizzes = sum(course.total_topics for course in courses)
-    pending_quizzes = total_quizzes - completed_quizzes
+    # ---------------------------
+    # Count Courses Completed
+    # ---------------------------
+    courses_completed_count = 0
+    for course in courses:
+        topics_in_course = db.query(Topic).filter(Topic.course_id == course.id).all()
+        if not topics_in_course:
+            continue
+        completed_topics_count = db.query(StudentCourseProgress).filter(
+            StudentCourseProgress.student_id == student.id,
+            StudentCourseProgress.topic_id.in_([t.id for t in topics_in_course]),
+            StudentCourseProgress.completed == True
+        ).count()
+        if completed_topics_count >= course.total_topics:
+            courses_completed_count += 1
 
-    # Compute CO mastery for selected course
+    # CO progress for selected course
     if selected_course:
         co_progress_dict = compute_co_progress(db, student.id, selected_course.id)
         co_labels = list(co_progress_dict.keys())
@@ -79,13 +85,13 @@ def student_dashboard(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "flashed": flashed,
             "student": student,
-            "selected_course": selected_course, 
+            "selected_course": selected_course,
             "course_count": course_count,
             "co_labels": co_labels,
             "co_values": co_values,
             "completed_quizzes": completed_quizzes,
             "course_progress": course_progress,
-            "pending_quizzes": pending_quizzes,
+            "courses_completed_count": courses_completed_count,  
             "session": request.session
         }
     )

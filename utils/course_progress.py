@@ -1,60 +1,40 @@
 from sqlalchemy.orm import Session
-from database.models import StudentTopicProgress, Topic, Course, User
+from database.models import StudentCourseProgress, Topic, Course, User
 
-def get_student_course_progress(db: Session, course_id: int, student_id: int, total_topics: int = 10):
+
+def get_student_course_progress(db: Session, student_id: int, course_id: int):
     """
     Returns the student's progress for a given course in percentage.
-    Progress is calculated based on how many topics are completed or viewed.
-    If a topic is completed or viewed, it counts toward progress.
     """
-    # Get all topic progress for this student in this course
-    topics_progress = (
-        db.query(StudentTopicProgress)
-        .join(Topic, StudentTopicProgress.topic_id == Topic.id)
-        .filter(Topic.course_id == course_id, StudentTopicProgress.student_id == student_id)
-        .all()
+
+    courses = db.query(Course).all()
+    # Get total topics in the course
+    total_topics = courses.total_topics or 0
+    if total_topics == 0:
+        return {
+            "progress_percentage": 0,
+            "completed_topics": 0,
+            "total_topics": 0
+        }
+
+
+    # Get completed topics for student
+    completed_topics = (
+        db.query(StudentCourseProgress)
+        .join(Topic, StudentCourseProgress.topic_id == Topic.id)
+        .filter(StudentCourseProgress.student_id == student_id)
+        .filter(Topic.course_id == course_id)
+        .filter(StudentCourseProgress.completed == True)
+        .count()
     )
 
-    completed = sum(1 for t in topics_progress if t.completed)
-    viewed = sum(1 for t in topics_progress if t.viewed)
-
-    # If no progress record yet, viewed/completed counts are 0
-    progress_percentage = ((completed + viewed) / total_topics) * 100
-    progress_percentage = min(progress_percentage, 100)  
+    progress_percentage = round((completed_topics / total_topics) * 100)
 
     return {
-        "progress_percentage": round(progress_percentage, 2),
-        "completed_topics": completed,
-        "viewed_topics": viewed,
+        "progress_percentage": progress_percentage,
+        "completed_topics": completed_topics,
         "total_topics": total_topics
     }
 
 
-def get_course_overall_progress(db: Session, course_id: int, total_topics: int = 10):
-    """
-    Returns average course progress across all students in a course.
-    """
-    # Get all students who have any progress record in this course
-    student_ids = (
-        db.query(StudentTopicProgress.student_id)
-        .join(Topic, StudentTopicProgress.topic_id == Topic.id)
-        .filter(Topic.course_id == course_id)
-        .distinct()
-        .all()
-    )
-    student_ids = [s[0] for s in student_ids]
 
-    if not student_ids:
-        return {"average_progress": 0, "total_students": 0}
-
-    total_progress = 0
-    for student_id in student_ids:
-        student_progress = get_student_course_progress(db, course_id, student_id, total_topics)
-        total_progress += student_progress["progress_percentage"]
-
-    average_progress = total_progress / len(student_ids)
-
-    return {
-        "average_progress": round(average_progress, 2),
-        "total_students": len(student_ids)
-    }
